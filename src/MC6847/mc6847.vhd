@@ -72,7 +72,7 @@ architecture SYN of mc6847 is
   constant H_BACK_PORCH       : integer := H_HORIZ_SYNC + 24;
   constant H_LEFT_BORDER      : integer := H_BACK_PORCH + 32; -- adjust for hblank de-assert @sys_count=6
   constant H_LEFT_RSTADDR     : integer := H_LEFT_BORDER - 16;
-  constant H_VIDEO            : integer := H_LEFT_BORDER + 257;
+  constant H_VIDEO            : integer := H_LEFT_BORDER + 256;
   constant H_RIGHT_BORDER     : integer := H_VIDEO + 31;      -- "
   constant H_TOTAL_PER_LINE   : integer := H_RIGHT_BORDER;
   
@@ -251,16 +251,18 @@ begin
           vga_hsync <= '1';
 		  elsif h_count = H_BACK_PORCH then
           vga_hborder <= '1';
-        elsif h_count = H_LEFT_BORDER then
-           active_h_count := (others => '0');
 		  elsif h_count = H_LEFT_BORDER+1 then
           vga_hblank <= '0';
-        elsif h_count = H_VIDEO then
+        elsif h_count = H_VIDEO+1 then
           vga_hblank <= '1';
         elsif h_count = H_RIGHT_BORDER then
           vga_hborder <= '0';
+        end if;
+
+        if h_count = H_LEFT_BORDER then
+           active_h_count := (others => '1');
         else
-          active_h_count := std_logic_vector(unsigned(active_h_count) + 1);
+           active_h_count := std_logic_vector(unsigned(active_h_count) + 1);
         end if;
 
       end if;
@@ -644,9 +646,10 @@ begin
           end if;
         end if;
       end if; -- CVBS_NOT_VGA
-      red <= r; green <= g; blue <= b;
+      red <= r; green <= g; blue <= b;		
     end if; -- rising_edge(clk)
-    
+
+
     if CVBS_NOT_VGA then
       hsync <= cvbs_hsync;
       vsync <= cvbs_vsync;
@@ -658,6 +661,7 @@ begin
       hblank <= not vga_hborder; 
       vblank <= not cvbs_vborder; 
     end if;
+
   end process PROC_OUTPUT;
 
 -- line buffer for scan doubler gives us vga monitor compatible output
