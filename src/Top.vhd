@@ -59,19 +59,20 @@ entity Top is
         
         -- 5 bit VGA Output
         
-      R : out  std_logic_vector (1 downto 0);
-      G: out  std_logic_vector (1 downto 0);
-      B: out  std_logic_vector (0 downto 0);
-      HSYNC : out  std_logic;
-      VSYNC : out  std_logic;
+        R : out  std_logic_vector (1 downto 0);
+        G: out  std_logic_vector (1 downto 0);
+        B: out  std_logic_vector (0 downto 0);
+        HSYNC : out  std_logic;
+        VSYNC : out  std_logic;
 
         -- Other GODIL specific pins
 
         CLK49 : in  std_logic;
         
+		  nRST : in std_logic;
+		  
         -- Test Pins
         
-        Test0 : out std_logic;
         Test1 : out std_logic;
         Test2 : out std_logic;
         Test3 : out std_logic
@@ -82,9 +83,10 @@ end Top;
 
 architecture BEHAVIORAL of Top is
 
-  signal clock12 : std_logic;
-  signal reset : std_logic;
-  
+    constant BLACK_BACKGND : std_logic := '1';
+
+    signal clock12 : std_logic;
+    signal reset : std_logic;
 
     signal nWR1 : std_logic;
     signal nWR2 : std_logic;
@@ -106,8 +108,12 @@ architecture BEHAVIORAL of Top is
     
     signal addrb : std_logic_vector (12 downto 0);
     signal doutb : std_logic_vector (7 downto 0);
-         
-     component mc6847
+    
+	 signal gm_masked : std_logic_vector (2 downto 0);
+	 signal ag_masked : std_logic;
+	 signal css_masked : std_logic;
+	 
+    component mc6847
     port(
         clk : in std_logic;
         clk_ena : in std_logic;
@@ -139,7 +145,7 @@ architecture BEHAVIORAL of Top is
     end component;
 
     component VideoRam
-      port (
+    port (
          clka : in std_logic;
          wea : in std_logic;
          addra : in std_logic_vector(12 DOWNTO 0);
@@ -150,7 +156,7 @@ architecture BEHAVIORAL of Top is
          addrb : in std_logic_vector(12 DOWNTO 0);
          dinb : in std_logic_vector(7 DOWNTO 0);
          doutb : out std_logic_vector(7 DOWNTO 0)
-      );
+         );
     end component;
 
     component DCM0
@@ -167,27 +173,29 @@ begin
 
     reset <= '0';
 
-    Inst_DCM0: DCM0 PORT MAP(
+    Inst_DCM0: DCM0
+	 port map (
         CLKIN_IN => CLK49,
         CLK0_OUT => clock12,
         CLK0_OUT1 => open,
         CLK2X_OUT => open
     );
 
-    Inst_mc6847: mc6847 PORT MAP(
+    Inst_mc6847: mc6847
+	 port map (
         clk => clock12,
         clk_ena => '1',
         reset => reset,
-      da0 => open,
+        da0 => open,
         videoaddr => addrb,
         dd => doutb,
         hs_n => nHS,
         fs_n => nFS,
-        an_g => AG,
+        an_g => ag_masked,
         an_s => doutb(6),
         intn_ext => doutb(6),
-        gm => GM(2 downto 0),
-        css => CSS,
+        gm => gm_masked,
+        css => css_masked,
         inv => doutb(7),
         red => vred,
         green => vgreen,
@@ -199,11 +207,12 @@ begin
         artifact_phase => '0',
         hblank => open,
         vblank => open,
-        cvbs => open 
+        cvbs => open,
+        black_backgnd => BLACK_BACKGND	  
     );
     
     Inst_VideoRam : VideoRam
-      port map (
+	 port map (
          clka => CLK49,
          wea => wr,
          addra => addra,
@@ -218,9 +227,9 @@ begin
       
      process (CLK49)
      begin
-        if rising_edge(CLK49) then
-              nWR2 <= nWR1;
-              nWR1 <= nWR or nMS; 
+         if rising_edge(CLK49) then
+             nWR2 <= nWR1;
+             nWR1 <= nWR or nMS; 
              DD2 <= DD1;
              DD1 <= DD;
              DA2 <= DA1;
@@ -229,33 +238,33 @@ begin
      end process;
 
      -- Write just before the rising edge of nWR
-     -- (adds two cycles of latency to reads, bur this should be fine)
-    wr <= '1' when (nWR1 = '1' and nWR2 = '0') else '0';     
-     dina <= DD2;
-    addra <= DA2;
-     
-     DD <= douta when (nMS = '0' and nWR = '1') else (others=>'Z');
+     wr    <= '1' when (nWR1 = '1' and nWR2 = '0') else '0';     
+     dina  <= DD2;
+     addra <= DA2;
+     DD    <= douta when (nMS = '0' and nWR = '1') else (others=>'Z');
           
      -- Unused PL4 Connectors
      -- Could also drive 1 bit RGB out here...
-
      OA <= '0';
      OB <= '0';
      CHB <= '0';
      Y  <= '0';
 
      -- RGB mapping
-	  black_backgnd <= '0';
      R(1) <= vred(7);
      R(0) <= vred(6);
      G(1) <= vgreen(7);
      G(0) <= vgreen(6);
      B(0) <= vblue(7);
      
-     -- Test Pins
-     
-     Test0 <= clock12;
-     Test1 <= CLK49;
+	  -- During reset, force the 6947 mode select inputs low
+	  -- (this is necessary to stop the mode changing during reset, as the GODIL has 1.5K pullups)
+	  gm_masked <= GM(2 downto 0) when nRST = '1' else (others => '0');
+	  ag_masked <= AG when nRST = '1' else '0';
+	  css_masked <= CSS when nRST = '1' else '0';
+
+     -- Test Pins    
+     Test1 <= '0';
      Test2 <= '0';
      Test3 <= '0';
     
