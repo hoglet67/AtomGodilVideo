@@ -34,7 +34,9 @@ entity mc6847 is
     artifact_en     : in std_logic;
     artifact_set    : in std_logic;
     artifact_phase  : in std_logic;
-    cvbs      : out std_logic_vector(7 downto 0)	);
+    cvbs            : out std_logic_vector(7 downto 0);
+	 black_backgnd   : in std_logic
+	 );
 end mc6847;
 
 architecture SYN of mc6847 is
@@ -178,7 +180,7 @@ architecture SYN of mc6847 is
       b := pal(to_integer(unsigned(chroma)))(2) & "000000";
     else
       -- not quite black in alpha mode
-      if an_g_v = '0' and an_s_v = '0' then
+      if black_backgnd = '0' and an_g_v = '0' and an_s_v = '0' then
         -- dark green/orange
         r := '0' & css_v & "000000";
         g := "01000000";

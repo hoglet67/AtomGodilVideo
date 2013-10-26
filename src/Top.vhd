@@ -133,7 +133,8 @@ architecture BEHAVIORAL of Top is
         vsync : out std_logic;
         hblank : out std_logic;
         vblank : out std_logic;
-        cvbs : out std_logic_vector(7 downto 0)
+        cvbs : out std_logic_vector(7 downto 0);
+		  black_backgnd : in std_logic
         );
     end component;
 
@@ -244,6 +245,7 @@ begin
      Y  <= '0';
 
      -- RGB mapping
+	  black_backgnd <= '0';
      R(1) <= vred(7);
      R(0) <= vred(6);
      G(1) <= vgreen(7);
