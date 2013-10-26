@@ -72,8 +72,8 @@ architecture SYN of mc6847 is
   constant H_BACK_PORCH       : integer := H_HORIZ_SYNC + 24;
   constant H_LEFT_BORDER      : integer := H_BACK_PORCH + 32; -- adjust for hblank de-assert @sys_count=6
   constant H_LEFT_RSTADDR     : integer := H_LEFT_BORDER - 16;
-  constant H_VIDEO            : integer := H_LEFT_BORDER + 256;
-  constant H_RIGHT_BORDER     : integer := H_VIDEO + 32;      -- "
+  constant H_VIDEO            : integer := H_LEFT_BORDER + 257;
+  constant H_RIGHT_BORDER     : integer := H_VIDEO + 31;      -- "
   constant H_TOTAL_PER_LINE   : integer := H_RIGHT_BORDER;
   
   constant V2_FRONT_PORCH      : integer := 2;
