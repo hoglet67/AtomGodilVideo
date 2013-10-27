@@ -37,7 +37,6 @@ entity Top is
         --
         -- expept DA which is now input only
         -- except nRP which re-purposed as a nWR
-        -- except INV which is used as an output
 
         CLK    : in    std_logic;
         DD     : inout std_logic_vector (7 downto 0);
@@ -68,7 +67,6 @@ entity Top is
         -- Other GODIL specific pins
 
         CLK49 : in std_logic;
-
         nRST : in std_logic;
 
         -- Test Pins
@@ -82,11 +80,17 @@ end Top;
 
 architecture BEHAVIORAL of Top is
 
+    -- Set this to 0 if you want dark green/dark orange background on text
+    -- Set this to 1 if you want black background on text (authentic Atom)
     constant BLACK_BACKGND : std_logic := '1';
 
+    -- Clock12 is a half speed VGA clock
     signal clock12 : std_logic;
+    
+    -- Reset signal to 6847, not currently used
     signal reset   : std_logic;
 
+    -- pipelined versions of the address/data/write signals
     signal nWR1 : std_logic;
     signal nWR2 : std_logic;
     signal nMS1 : std_logic;
@@ -96,21 +100,34 @@ architecture BEHAVIORAL of Top is
     signal DD1  : std_logic_vector (7 downto 0);
     signal DD2  : std_logic_vector (7 downto 0);
 
+    -- VGA colour signals out of mc6847, only top 2 bits are used
     signal vred   : std_logic_vector (7 downto 0);
     signal vgreen : std_logic_vector (7 downto 0);
     signal vblue  : std_logic_vector (7 downto 0);
+    
+    -- 8Kx8 Dual port video RAM signals
+    -- Port A connects to Atom and is read/write
+    -- Port B connects to MC6847 and is read only
     signal wr     : std_logic;
-
     signal addra : std_logic_vector (12 downto 0);
     signal dina  : std_logic_vector (7 downto 0);
     signal douta : std_logic_vector (7 downto 0);
-
     signal addrb : std_logic_vector (12 downto 0);
     signal doutb : std_logic_vector (7 downto 0);
 
+    -- Masked (by nRST) version of the mode control signals
     signal gm_masked  : std_logic_vector (2 downto 0);
     signal ag_masked  : std_logic;
     signal css_masked : std_logic;
+
+    component DCM0
+        port(
+            CLKIN_IN  : in  std_logic;
+            CLK0_OUT  : out std_logic;
+            CLK0_OUT1 : out std_logic;
+            CLK2X_OUT : out std_logic
+            );
+    end component;
 
     component mc6847
         port(
@@ -158,20 +175,13 @@ architecture BEHAVIORAL of Top is
             );
     end component;
 
-    component DCM0
-        port(
-            CLKIN_IN  : in  std_logic;
-            CLK0_OUT  : out std_logic;
-            CLK0_OUT1 : out std_logic;
-            CLK2X_OUT : out std_logic
-            );
-    end component;
-
-
 begin
 
     reset <= '0';
 
+    -- Currently set at 49.152 * 8 / 31 = 12.684MHz
+    -- half VGA should be 25.175 / 2 = 12. 5875
+    -- we could get closer with to cascaded multipliers
     Inst_DCM0 : DCM0
         port map (
             CLKIN_IN  => CLK49,
@@ -180,6 +190,10 @@ begin
             CLK2X_OUT => open
             );
 
+    -- Motorola MC6847
+    -- Original version: https://svn.pacedev.net/repos/pace/sw/src/component/video/mc6847.vhd
+    -- Updated by AlanD for his Atom FPGA: http://stardot.org.uk/forums/viewtopic.php?f=3&t=6313
+    -- A further few bugs fixed by myself
     Inst_mc6847 : mc6847
         port map (
             clk            => clock12,
@@ -210,6 +224,9 @@ begin
             black_backgnd  => BLACK_BACKGND
             );
 
+    -- 8Kx8 Dual port video RAM
+    -- Port A connects to Atom and is read/write
+    -- Port B connects to MC6847 and is read only
     Inst_VideoRam : VideoRam
         port map (
             clka  => CLK49,
@@ -224,6 +241,7 @@ begin
             doutb => doutb
             );
 
+    -- Pipelined version of address/data/write signals
     process (CLK49)
     begin
         if rising_edge(CLK49) then
