@@ -101,9 +101,11 @@ architecture BEHAVIORAL of Top is
     signal DD2  : std_logic_vector (7 downto 0);
 
     -- VGA colour signals out of mc6847, only top 2 bits are used
-    signal vred   : std_logic_vector (7 downto 0);
-    signal vgreen : std_logic_vector (7 downto 0);
-    signal vblue  : std_logic_vector (7 downto 0);
+    signal vga_red   : std_logic_vector (7 downto 0);
+    signal vga_green : std_logic_vector (7 downto 0);
+    signal vga_blue  : std_logic_vector (7 downto 0);
+    signal vga_vsync : std_logic;
+    signal vga_hsync : std_logic;
     
     -- 8Kx8 Dual port video RAM signals
     -- Port A connects to Atom and is read/write
@@ -116,6 +118,7 @@ architecture BEHAVIORAL of Top is
     signal doutb : std_logic_vector (7 downto 0);
 
     -- Masked (by nRST) version of the mode control signals
+    signal mask  : std_logic;    
     signal gm_masked  : std_logic_vector (2 downto 0);
     signal ag_masked  : std_logic;
     signal css_masked : std_logic;
@@ -210,11 +213,11 @@ begin
             gm             => gm_masked,
             css            => css_masked,
             inv            => doutb(7),
-            red            => vred,
-            green          => vgreen,
-            blue           => vblue,
-            hsync          => HSYNC,
-            vsync          => VSYNC,
+            red            => vga_red,
+            green          => vga_green,
+            blue           => vga_blue,
+            hsync          => vga_hsync,
+            vsync          => vga_vsync,
             artifact_en    => '0',
             artifact_set   => '0',
             artifact_phase => '0',
@@ -268,17 +271,40 @@ begin
     Y   <= '0';
 
     -- RGB mapping
-    R(1) <= vred(7);
-    R(0) <= vred(6);
-    G(1) <= vgreen(7);
-    G(0) <= vgreen(6);
-    B(0) <= vblue(7);
-
-    -- During reset, force the 6947 mode select inputs low
+    R(1) <= vga_red(7);
+    R(0) <= vga_red(6);
+    G(1) <= vga_green(7);
+    G(0) <= vga_green(6);
+    B(0) <= vga_blue(7);
+    VSYNC <= vga_vsync;
+    HSYNC <= vga_hsync;
+    
+    -- Hold internal reset low for two frames after nRST released
+    -- This avoids any diaplay glitches
+    process (Clock12)
+    variable state : std_logic_vector(2 downto 0);
+    begin
+        if rising_edge(Clock12) then
+            if (nRST = '0') then
+                state := "000";
+            elsif (state = "000" and vga_vsync = '0') then
+                state := "001";
+            elsif (state = "001" and vga_vsync = '1') then
+                state := "010";
+            elsif (state = "010" and vga_vsync = '0') then
+                state := "011";
+            elsif (state = "011" and vga_vsync = '1') then
+                state := "100";
+            end if;
+            mask <= state(2);
+        end if;
+    end process;
+    
+    -- During reset, force the 6847 mode select inputs low
     -- (this is necessary to stop the mode changing during reset, as the GODIL has 1.5K pullups)
-    gm_masked  <= GM(2 downto 0) when nRST = '1' else (others => '0');
-    ag_masked  <= AG             when nRST = '1' else '0';
-    css_masked <= CSS            when nRST = '1' else '0';
+    gm_masked  <= GM(2 downto 0) when mask = '1' else (others => '0');
+    ag_masked  <= AG             when mask = '1' else '0';
+    css_masked <= CSS            when mask = '1' else '0';
 
     -- Test Pins    
     Test1 <= '0';
