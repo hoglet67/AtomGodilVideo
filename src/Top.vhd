@@ -66,7 +66,7 @@ entity Top is
 
         -- Other GODIL specific pins
 
-        CLK49 : in std_logic;
+        clock49 : in std_logic;
         nRST : in std_logic;
 
         -- Test Pins
@@ -86,6 +86,13 @@ architecture BEHAVIORAL of Top is
 
     -- Clock12 is a half speed VGA clock
     signal clock12 : std_logic;
+    
+    -- Other clocks are for SID
+    -- 1MHZ, 32MHz and 
+    signal div32  : std_logic_vector (4 downto 0);
+    signal clock1 : std_logic;
+    signal clock15 : std_logic;
+    signal clock32 : std_logic;
     
     -- Reset signal to 6847, not currently used
     signal reset   : std_logic;
@@ -117,13 +124,44 @@ architecture BEHAVIORAL of Top is
     signal addrb : std_logic_vector (12 downto 0);
     signal doutb : std_logic_vector (7 downto 0);
 
+    -- Dout back to the Atom, that is either VRAM or SID
+    signal dout  : std_logic_vector (7 downto 0);
+
     -- Masked (by nRST) version of the mode control signals
     signal mask  : std_logic;    
     signal gm_masked  : std_logic_vector (2 downto 0);
     signal ag_masked  : std_logic;
     signal css_masked : std_logic;
+    
+
+    -- SID sigmals
+    signal sid_cs : std_logic;
+    signal sid_we : std_logic;
+    signal sid_addr  : std_logic_vector (4 downto 0);
+    signal sid_do  : std_logic_vector (7 downto 0);
+    signal sid_di  : std_logic_vector (7 downto 0);
+    signal sid_audio : std_logic;
+
 
     component DCM0
+        port(
+            CLKIN_IN  : in  std_logic;
+            CLK0_OUT  : out std_logic;
+            CLK0_OUT1 : out std_logic;
+            CLK2X_OUT : out std_logic
+            );
+    end component;
+
+    component DCMSID0
+        port(
+            CLKIN_IN  : in  std_logic;
+            CLK0_OUT  : out std_logic;
+            CLK0_OUT1 : out std_logic;
+            CLK2X_OUT : out std_logic
+            );
+    end component;
+
+    component DCMSID1
         port(
             CLKIN_IN  : in  std_logic;
             CLK0_OUT  : out std_logic;
@@ -177,6 +215,24 @@ architecture BEHAVIORAL of Top is
             doutb : out std_logic_vector(7 downto 0)
             );
     end component;
+    
+    component sid6581
+        port(
+            clk_1MHz : in std_logic;
+            clk32 : in std_logic;
+            clk_DAC : in std_logic;
+            reset : in std_logic;
+            cs : in std_logic;
+            we : in std_logic;
+            addr : in std_logic_vector(4 downto 0);
+            di : in std_logic_vector(7 downto 0);    
+            pot_x : in std_logic;
+            pot_y : in std_logic;      
+            do : out std_logic_vector(7 downto 0);
+            audio_out : out std_logic;
+            audio_data : out std_logic_vector(17 downto 0)
+            );
+    end component;
 
 begin
 
@@ -187,12 +243,28 @@ begin
     -- we could get closer with to cascaded multipliers
     Inst_DCM0 : DCM0
         port map (
-            CLKIN_IN  => CLK49,
+            CLKIN_IN  => clock49,
             CLK0_OUT  => clock12,
             CLK0_OUT1 => open,
             CLK2X_OUT => open
             );
 
+    Inst_DCMSID0 : DCMSID0
+        port map (
+            CLKIN_IN  => clock49,
+            CLK0_OUT  => clock15,
+            CLK0_OUT1 => open,
+            CLK2X_OUT => open
+            );
+            
+    Inst_DCMSID1 : DCMSID1
+        port map (
+            CLKIN_IN  => clock15,
+            CLK0_OUT  => clock32,
+            CLK0_OUT1 => open,
+            CLK2X_OUT => open
+            );            
+            
     -- Motorola MC6847
     -- Original version: https://svn.pacedev.net/repos/pace/sw/src/component/video/mc6847.vhd
     -- Updated by AlanD for his Atom FPGA: http://stardot.org.uk/forums/viewtopic.php?f=3&t=6313
@@ -232,7 +304,7 @@ begin
     -- Port B connects to MC6847 and is read only
     Inst_VideoRam : VideoRam
         port map (
-            clka  => CLK49,
+            clka  => clock32,
             wea   => wr,
             addra => addra,
             dina  => dina,
@@ -244,24 +316,60 @@ begin
             doutb => doutb
             );
 
+    Inst_sid6581: sid6581
+        port map (
+            clk_1MHz => clock1,
+            clk32 => clock32,
+            clk_DAC => clock49,
+            reset => not nRST,
+            cs => sid_cs,
+            we => sid_we,
+            addr => sid_addr,
+            di => sid_di,
+            do => sid_do,
+            pot_x => '0',
+            pot_y => '0',
+            audio_out => sid_audio,
+            audio_data => open 
+        );
+
+
     -- Pipelined version of address/data/write signals
-    process (CLK49)
+    process (clock32)
     begin
-        if rising_edge(CLK49) then
+        if rising_edge(clock32) then
+            nMS2 <= nMS1;
+            nMS1 <= nMS;
             nWR2 <= nWR1;
             nWR1 <= nWR or nMS;
             DD2  <= DD1;
-            Dd1  <= DD;
+            DD1  <= DD;
             DA2  <= DA1;
             DA1  <= DA;
+            div32 <= div32 + 1;
         end if;
     end process;
 
+    -- Clock1 is derived by dividing clock32 down by 32
+    clock1 <= div32(4);
+
+    -- Signals driving the VRAM
     -- Write just before the rising edge of nWR
-    wr    <= '1'   when (nWR1 = '1' and nWR2 = '0') else '0';
+    wr    <= '1' when (nWR1 = '1' and nWR2 = '0') else '0';
     dina  <= DD2;
     addra <= DA2;
-    DD    <= douta when (nMS = '0' and nWR = '1')   else (others => 'Z');
+    
+    -- Signals driving the SID
+    -- Kees's Atom SID is at BDC0-BDDF
+    -- This one will be at 9DC0-9DDF
+    sid_cs <= '1' when nMS2 = '0' and DA2(12 downto 5) = "11101110" else '0';
+    sid_we <= wr;
+    sid_di <= DD2;
+    sid_addr <= DA2(4 downto 0);
+    
+    -- Tri-state data back to the Atom
+    dout <= sid_do when sid_cs = '1' else douta;
+    DD    <= dout when (nMS = '0' and nWR = '1') else (others => 'Z');
 
     -- Unused PL4 Connectors
     -- Could also drive 1 bit RGB out here...
@@ -307,9 +415,9 @@ begin
     css_masked <= CSS            when mask = '1' else '0';
 
     -- Test Pins    
-    Test1 <= '0';
-    Test2 <= '0';
-    Test3 <= '0';
+    Test1 <= sid_audio;
+    Test2 <= clock32;
+    Test3 <= clock1;
     
 end BEHAVIORAL;
 
