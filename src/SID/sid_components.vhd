@@ -5,7 +5,7 @@
 --     This piece of VHDL code describes a single SID voice (sound channel)
 --
 -------------------------------------------------------------------------------
--- to do:	- better resolution of result signal voice, this is now only 12bits,
+-- to do:	- better resolution of result signal voice, this is now only 10bits,
 -- but it could be 20 !! Problem, it does not fit the PWM-dac
 -------------------------------------------------------------------------------
 
