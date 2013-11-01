@@ -274,18 +274,18 @@ begin
 	Snd_select:process(clk_1MHz)
 	begin
 		if (rising_edge(clk_1MHz)) then
-			signal_mux(11) <= (triangle(11) and Control(4)) or (sawtooth(11) and Control(5)) or (pulse and Control(6)) or (noise(11) and Control(7));
-			signal_mux(10) <= (triangle(10) and Control(4)) or (sawtooth(10) and Control(5)) or (pulse and Control(6)) or (noise(10) and Control(7));
-			signal_mux(9)  <= (triangle(9)  and Control(4)) or (sawtooth(9)  and Control(5)) or (pulse and Control(6)) or (noise(9)  and Control(7));
-			signal_mux(8)  <= (triangle(8)  and Control(4)) or (sawtooth(8)  and Control(5)) or (pulse and Control(6)) or (noise(8)  and Control(7));
-			signal_mux(7)  <= (triangle(7)  and Control(4)) or (sawtooth(7)  and Control(5)) or (pulse and Control(6)) or (noise(7)  and Control(7));
-			signal_mux(6)  <= (triangle(6)  and Control(4)) or (sawtooth(6)  and Control(5)) or (pulse and Control(6)) or (noise(6)  and Control(7));
-			signal_mux(5)  <= (triangle(5)  and Control(4)) or (sawtooth(5)  and Control(5)) or (pulse and Control(6)) or (noise(5)  and Control(7));
-			signal_mux(4)  <= (triangle(4)  and Control(4)) or (sawtooth(4)  and Control(5)) or (pulse and Control(6)) or (noise(4)  and Control(7));
-			signal_mux(3)  <= (triangle(3)  and Control(4)) or (sawtooth(3)  and Control(5)) or (pulse and Control(6)) or (noise(3)  and Control(7));
-			signal_mux(2)  <= (triangle(2)  and Control(4)) or (sawtooth(2)  and Control(5)) or (pulse and Control(6)) or (noise(2)  and Control(7));
-			signal_mux(1)  <= (triangle(1)  and Control(4)) or (sawtooth(1)  and Control(5)) or (pulse and Control(6)) or (noise(1)  and Control(7));
-			signal_mux(0)  <= (triangle(0)  and Control(4)) or (sawtooth(0)  and Control(5)) or (pulse and Control(6)) or (noise(0)  and Control(7));
+			signal_mux(11) <= (triangle(11) or not Control(4)) and (sawtooth(11) or not Control(5)) and (pulse or not Control(6)) and (noise(11) or not Control(7));
+			signal_mux(10) <= (triangle(10) or not Control(4)) and (sawtooth(10) or not Control(5)) and (pulse or not Control(6)) and (noise(10) or not Control(7));
+			signal_mux(9)  <= (triangle(9)  or not Control(4)) and (sawtooth(9)  or not Control(5)) and (pulse or not Control(6)) and (noise(9)  or not Control(7));
+			signal_mux(8)  <= (triangle(8)  or not Control(4)) and (sawtooth(8)  or not Control(5)) and (pulse or not Control(6)) and (noise(8)  or not Control(7));
+			signal_mux(7)  <= (triangle(7)  or not Control(4)) and (sawtooth(7)  or not Control(5)) and (pulse or not Control(6)) and (noise(7)  or not Control(7));
+			signal_mux(6)  <= (triangle(6)  or not Control(4)) and (sawtooth(6)  or not Control(5)) and (pulse or not Control(6)) and (noise(6)  or not Control(7));
+			signal_mux(5)  <= (triangle(5)  or not Control(4)) and (sawtooth(5)  or not Control(5)) and (pulse or not Control(6)) and (noise(5)  or not Control(7));
+			signal_mux(4)  <= (triangle(4)  or not Control(4)) and (sawtooth(4)  or not Control(5)) and (pulse or not Control(6)) and (noise(4)  or not Control(7));
+			signal_mux(3)  <= (triangle(3)  or not Control(4)) and (sawtooth(3)  or not Control(5)) and (pulse or not Control(6)) and (noise(3)  or not Control(7));
+			signal_mux(2)  <= (triangle(2)  or not Control(4)) and (sawtooth(2)  or not Control(5)) and (pulse or not Control(6)) and (noise(2)  or not Control(7));
+			signal_mux(1)  <= (triangle(1)  or not Control(4)) and (sawtooth(1)  or not Control(5)) and (pulse or not Control(6)) and (noise(1)  or not Control(7));
+			signal_mux(0)  <= (triangle(0)  or not Control(4)) and (sawtooth(0)  or not Control(5)) and (pulse or not Control(6)) and (noise(0)  or not Control(7));
 		end if;
 	end process;
 
