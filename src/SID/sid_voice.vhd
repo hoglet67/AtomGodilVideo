@@ -125,13 +125,9 @@ begin
 	-- signal to the input of other channels/voices
 	Env							<= env_counter;
 	-- use the register value to fill the variable
-	frequency(15 downto 8)	<= Freq_hi(7 downto 0);
-	--
-	frequency(7 downto 0)	<= Freq_lo(7 downto 0);
+	frequency	<= Freq_hi & Freq_lo;
 	-- use the register value to fill the variable
-	pulsewidth(11 downto 8)	<= Pw_hi(3 downto 0);
-	--
-	pulsewidth(7 downto 0)	<= Pw_lo(7 downto 0);
+	pulsewidth 	<= Pw_hi & Pw_lo;
 	--
 	voice							<= signal_vol(19 downto 8);
 
@@ -154,7 +150,7 @@ begin
 				accumulator <= (others => '0');
 			else
 				-- accumulate the new phase (i.o.w. increment env_counter with the freq. value)
-				accumulator <= accumulator + ("0" & frequency(15 downto 0));
+				accumulator <= accumulator + ("0" & frequency);
 			end if;
 		end if;
 	end process;
@@ -177,7 +173,7 @@ begin
 	Snd_pulse:process(clk_1MHz)
 	begin
 		if (rising_edge(clk_1MHz)) then
-			if ((accumulator(23 downto 12)) >= (pulsewidth(11 downto 0))) then
+			if ((accumulator(23 downto 12)) >= pulsewidth) then
 				pulse <= '1';
 			else
 				pulse <= '0';
@@ -249,16 +245,16 @@ begin
 				-- the "seed" value (the value that eventually determines the output
 				-- pattern) may never be '0' otherwise the generator "locks up"
 				LFSR	<= "00000000000000000000001";
+		else
+			accu_bit_prev	<= accumulator(19);
+			-- when not equal to ...
+			if	(accu_bit_prev /= accumulator(19)) then
+				LFSR(22 downto 1)	<= LFSR(21 downto 0);
+				LFSR(0) 					<= LFSR(17) xor LFSR(22);  -- see Xilinx XAPP052 for maximal LFSR taps
 			else
-				accu_bit_prev	<= accumulator(22);
-				-- when not equal to ...
-				if	(accu_bit_prev /= accumulator(22)) then
-					LFSR(22 downto 1)	<= LFSR(21 downto 0);
-					LFSR(0) 					<= LFSR(4) xor LFSR(22);
-				else
-					LFSR	 						<= LFSR;
-				end if;
+				LFSR	 						<= LFSR;
 			end if;
+		end if;
 		end if;
 	end process;
 
@@ -307,25 +303,6 @@ begin
 			signal_vol	<= signal_mux * env_counter;
 		end if;
 	end process;
-
-	-- Altera multiplier
-	--	lpm_mult_component : lpm_mult
-	--		GENERIC MAP
-	--		(
-	--			lpm_hint						=> "MAXIMIZE_SPEED=5",
-	--			lpm_representation	=> "UNSIGNED",
-	--			lpm_type						=> "LPM_MULT",
-	--			lpm_widtha					=> 12,
-	--			lpm_widthb					=> 8,
-	--			lpm_widthp					=> 20,
-	--			lpm_widths					=> 1
-	--		)
-	--		PORT MAP
-	--		(
-	--			dataa(11 downto 0)	=> signal_mux,
-	--			datab(7 downto 0)		=> env_counter,
-	--			result							=> signal_vol
-	--		);
 
 	-- Envelope generator :
 	-- "The Envelope Generator was simply an 8-bit up/down counter which, when
@@ -614,9 +591,9 @@ begin
 	Decay_Release_input_select:process(Dec_rel_sel, Att_dec, Sus_Rel)
 	begin
 		if (Dec_rel_sel = '0') then
-			Dec_rel(3 downto 0)	<= Att_dec(3 downto 0);
+			Dec_rel	<= Att_dec(3 downto 0);
 		else
-			Dec_rel(3 downto 0)	<= Sus_rel(3 downto 0);
+			Dec_rel	<= Sus_rel(3 downto 0);
 		end if;
 	end process;
 
@@ -630,7 +607,7 @@ begin
 			if reset = '1' then
 				divider_dec_rel <= 0;
 			else
-				case Dec_rel(3 downto 0) is
+				case Dec_rel is
 					when "0000" =>	divider_dec_rel <= 3;			--release rate: (    6mS / 1uS per clockcycle) / 1632
 					when "0001" =>	divider_dec_rel <= 15;		--release rate: (   24mS / 1uS per clockcycle) / 1632
 					when "0010" =>	divider_dec_rel <= 29;		--release rate: (   48mS / 1uS per clockcycle) / 1632

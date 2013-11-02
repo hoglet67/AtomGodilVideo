@@ -186,7 +186,7 @@ begin
 			when 6 =>
 				w.state := 7;
 				-- Adjust Vbp*Q, shift by 10
-				w.Vhp := (mulr(35)&mulr(35)&mulr(25 downto 10)) - r.vlp;
+				w.Vhp := (mulr(35)&mulr(26 downto 10)) - r.vlp;
 				if hp_bp_lp(0)='1' then
 					w.Vf := r.Vf + r.Vlp;
 				end if;
