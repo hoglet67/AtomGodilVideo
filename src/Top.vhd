@@ -59,11 +59,14 @@ entity Top is
         -- 5 bit VGA Output
 
         R     : out std_logic_vector (1 downto 0);
-        G     : out std_logic_vector (1 downto 0);
+        G     : out std_logic_vector (0 downto 0);
         B     : out std_logic_vector (0 downto 0);
         HSYNC : out std_logic;
         VSYNC : out std_logic;
-
+        
+        -- 1 bit AUDIO Output
+        AUDIO : out std_logic;
+        
         -- Other GODIL specific pins
 
         clock49 : in std_logic;
@@ -381,12 +384,12 @@ begin
     -- RGB mapping
     R(1) <= vga_red(7);
     R(0) <= vga_red(6);
-    G(1) <= vga_green(7);
-    G(0) <= vga_green(6);
+    G(0) <= vga_green(7);
     B(0) <= vga_blue(7);
     VSYNC <= vga_vsync;
     HSYNC <= vga_hsync;
-    
+    AUDIO <= sid_audio;
+
     -- Hold internal reset low for two frames after nRST released
     -- This avoids any diaplay glitches
     process (Clock12)
@@ -415,9 +418,9 @@ begin
     css_masked <= CSS            when mask = '1' else '0';
 
     -- Test Pins    
-    Test1 <= sid_audio;
-    Test2 <= clock32;
-    Test3 <= clock1;
+    Test1 <= '0';
+    Test2 <= '0';
+    Test3 <= '0';
     
 end BEHAVIORAL;
 
