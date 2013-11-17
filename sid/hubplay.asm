@@ -3,7 +3,7 @@
 ; C64 conversion by Kees van Oss 2012
 ;----------------------------------------------
 
-asm_code = $4000
+asm_code = $2A00
 
 org asm_code-22
 
