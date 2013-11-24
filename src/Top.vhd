@@ -58,8 +58,8 @@ entity Top is
 
         -- 5 bit VGA Output
 
-        R     : out std_logic_vector (1 downto 0);
-        G     : out std_logic_vector (0 downto 0);
+        R     : out std_logic_vector (0 downto 0);
+        G     : out std_logic_vector (1 downto 0);
         B     : out std_logic_vector (0 downto 0);
         HSYNC : out std_logic;
         VSYNC : out std_logic;
@@ -72,11 +72,7 @@ entity Top is
         clock49 : in std_logic;
         nRST : in std_logic;
 
-        -- Test Pins
-
-        Test1 : out std_logic;
-        Test2 : out std_logic;
-        Test3 : out std_logic
+        nPL4 : in std_logic
 
         );
 end Top;
@@ -280,7 +276,7 @@ begin
             da0            => open,
             videoaddr      => addrb,
             dd             => doutb,
-            hs_n           => nHS,
+            hs_n           => open,
             fs_n           => nFS,
             an_g           => ag_masked,
             an_s           => doutb(6),
@@ -374,17 +370,17 @@ begin
     dout <= sid_do when sid_cs = '1' else douta;
     DD    <= dout when (nMS = '0' and nWR = '1') else (others => 'Z');
 
-    -- Unused PL4 Connectors
-    -- Could also drive 1 bit RGB out here...
-    OA  <= '0';
-    OB  <= '0';
-    CHB <= '0';
-    Y   <= '0';
+    -- 1 Bit RGB Video to PL4 Connectors
+    OA  <= vga_red(7)    when nPL4 = '0' else '0';
+    CHB <= vga_green(7)  when nPL4 = '0' else '0';
+    OB  <= vga_blue(7)   when nPL4 = '0' else '0';
+    nHS <= vga_hsync     when nPL4 = '0' else '0';
+    Y   <= vga_vsync     when nPL4 = '0' else '0';
 
     -- RGB mapping
-    R(1) <= vga_red(7);
-    R(0) <= vga_red(6);
-    G(0) <= vga_green(7);
+    R(0) <= vga_red(7);
+    G(1) <= vga_green(7);
+    G(0) <= vga_green(6);
     B(0) <= vga_blue(7);
     VSYNC <= vga_vsync;
     HSYNC <= vga_hsync;
@@ -416,11 +412,6 @@ begin
     gm_masked  <= GM(2 downto 0) when mask = '1' else (others => '0');
     ag_masked  <= AG             when mask = '1' else '0';
     css_masked <= CSS            when mask = '1' else '0';
-
-    -- Test Pins    
-    Test1 <= '0';
-    Test2 <= '0';
-    Test3 <= '0';
     
 end BEHAVIORAL;
 
