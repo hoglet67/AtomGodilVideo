@@ -80,7 +80,10 @@ entity Top is
         nPL4 : in std_logic;
         
         -- Moves SID from 9FE0 to BDC0 
-        nSIDD : in std_logic
+        nSIDD : in std_logic;
+        
+        -- Active low version of the SID Select Signal for disabling the external bus buffers
+        nSIDSEL : out std_logic
 
         );
 end Top;
@@ -389,7 +392,11 @@ begin
     -- Tri-state data back to the Atom
     dout <= sid_do when sid_cs = '1' else douta;
     DD    <= dout when ((nMS = '0' or sid_cs = '1') and nWR = '1') else (others => 'Z');
+    
+    -- Output the SID Select Signal so it can be used to disable the bus buffers
 
+    nSIDSEL <= not sid_cs;
+    
     -- 1 Bit RGB Video to PL4 Connectors
     OA  <= vga_red(7)    when nPL4 = '0' else '0';
     CHB <= vga_green(7)  when nPL4 = '0' else '0';
