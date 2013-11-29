@@ -72,7 +72,15 @@ entity Top is
         clock49 : in std_logic;
         nRST : in std_logic;
 
-        nPL4 : in std_logic
+        nBXXX : in std_logic;
+
+        -- Jumpers
+        
+        -- Enables VGA Signals on PL4
+        nPL4 : in std_logic;
+        
+        -- Moves SID from 9FE0 to BDC0 
+        nSIDD : in std_logic
 
         );
 end Top;
@@ -101,6 +109,10 @@ architecture BEHAVIORAL of Top is
     signal nWR2 : std_logic;
     signal nMS1 : std_logic;
     signal nMS2 : std_logic;
+    signal nWRMS1 : std_logic;
+    signal nWRMS2 : std_logic;
+    signal nBXXX1 : std_logic;
+    signal nBXXX2 : std_logic;
     signal DA1  : std_logic_vector (12 downto 0);
     signal DA2  : std_logic_vector (12 downto 0);
     signal DD1  : std_logic_vector (7 downto 0);
@@ -337,10 +349,14 @@ begin
     process (clock32)
     begin
         if rising_edge(clock32) then
+            nBXXX2 <= nBXXX1;
+            nBXXX1 <= nBXXX;
             nMS2 <= nMS1;
             nMS1 <= nMS;
+            nWRMS2 <= nWRMS1;
+            nWRMS1 <= nWR or nMS;
             nWR2 <= nWR1;
-            nWR1 <= nWR or nMS;
+            nWR1 <= nWR;
             DD2  <= DD1;
             DD1  <= DD;
             DA2  <= DA1;
@@ -354,21 +370,25 @@ begin
 
     -- Signals driving the VRAM
     -- Write just before the rising edge of nWR
-    wr    <= '1' when (nWR1 = '1' and nWR2 = '0') else '0';
+    wr    <= '1' when (nWRMS1 = '1' and nWRMS2 = '0') else '0';
     dina  <= DD2;
     addra <= DA2;
     
     -- Signals driving the SID
     -- Kees's Atom SID is at BDC0-BDDF
     -- This one will be at 9DC0-9DDF
-    sid_cs <= '1' when nMS2 = '0' and DA2(12 downto 5) = "11101110" else '0';
-    sid_we <= wr;
+    sid_cs <= '1' when (nSIDD = '1' and nMS2 = '0' and DA2(12 downto 5) =  "11111111") or
+                       (nSIDD = '0' and nBXXX2 = '0' and DA2(11 downto 5) = "1101110") 
+                  else '0';
+
+    sid_we <=  '1' when (nWR1 = '1' and nWR2 = '0') else '0';
+
     sid_di <= DD2;
     sid_addr <= DA2(4 downto 0);
     
     -- Tri-state data back to the Atom
     dout <= sid_do when sid_cs = '1' else douta;
-    DD    <= dout when (nMS = '0' and nWR = '1') else (others => 'Z');
+    DD    <= dout when ((nMS = '0' or sid_cs = '1') and nWR = '1') else (others => 'Z');
 
     -- 1 Bit RGB Video to PL4 Connectors
     OA  <= vga_red(7)    when nPL4 = '0' else '0';
