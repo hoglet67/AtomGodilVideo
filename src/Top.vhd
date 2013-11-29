@@ -384,7 +384,9 @@ begin
                        (nSIDD = '0' and nBXXX2 = '0' and DA2(11 downto 5) = "1101110") 
                   else '0';
 
-    sid_we <=  '1' when (nWR1 = '1' and nWR2 = '0') else '0';
+    sid_we <= '1' when (nSIDD = '1' and nWRMS1 = '1' and nWRMS2 = '0') or
+                       (nSIDD = '0' and nWR1 = '1' and nWR2 = '0')
+                  else '0';
 
     sid_di <= DD2;
     sid_addr <= DA2(4 downto 0);
