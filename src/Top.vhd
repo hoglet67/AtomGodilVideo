@@ -393,7 +393,7 @@ begin
     
     -- Tri-state data back to the Atom
     dout <= sid_do when sid_cs = '1' else douta;
-    DD    <= dout when ((nMS = '0' or sid_cs = '1') and nWR = '1') else (others => 'Z');
+    DD    <= dout when (nMS = '0' and nWR = '1') else (others => 'Z');
     
     -- Output the SID Select Signal so it can be used to disable the bus buffers
 
