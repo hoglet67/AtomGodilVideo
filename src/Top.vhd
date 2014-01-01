@@ -156,6 +156,14 @@ architecture BEHAVIORAL of Top is
     signal sid_di  : std_logic_vector (7 downto 0);
     signal sid_audio : std_logic;
 
+    -- Atom Extensions register
+    signal extensions : std_logic_vector (7 downto 0);
+
+    signal mc6847_an_s : std_logic;
+    signal mc6847_intn_ext : std_logic;
+    signal mc6847_inv : std_logic;
+    signal mc6847_css : std_logic;
+    signal mc6847_d : std_logic_vector (7 downto 0);
 
     component DCM0
         port(
@@ -290,15 +298,15 @@ begin
             reset          => reset,
             da0            => open,
             videoaddr      => addrb,
-            dd             => doutb,
+            dd             => mc6847_d,
             hs_n           => open,
             fs_n           => nFS,
             an_g           => ag_masked,
-            an_s           => doutb(6),
-            intn_ext       => doutb(6),
+            an_s           => mc6847_an_s,
+            intn_ext       => mc6847_intn_ext,
             gm             => gm_masked,
-            css            => css_masked,
-            inv            => doutb(7),
+            css            => mc6847_css,
+            inv            => mc6847_inv,
             red            => vga_red,
             green          => vga_green,
             blue           => vga_blue,
@@ -312,10 +320,10 @@ begin
             cvbs           => open,
             black_backgnd  => BLACK_BACKGND
             );
-
+    
     -- 8Kx8 Dual port video RAM
     -- Port A connects to Atom and is read/write
-    -- Port B connects to MC6847 and is read only
+    -- Port B connects to MC6847 and is read only    
     Inst_VideoRam : VideoRam
         port map (
             clka  => clock32,
@@ -368,6 +376,56 @@ begin
         end if;
     end process;
 
+    -- A register to control extra 6847 features
+    process (clock32)
+    begin
+        if rising_edge(clock32) then
+            if (nRST = '0') then
+                extensions <= (others => '0');
+            elsif (sid_cs = '1' and sid_we = '1' and sid_addr = "11111") then
+                extensions <= sid_di;
+            end if;
+        end if;
+    end process;
+
+    --  00 = Normal (Text + Semi 6)
+    --
+    --  A/S = D6
+    --  INT_EXT = D6
+    --  INV = D7
+    --  CSS = 8255
+    --  D = D(7:0)
+    --
+    --  01 = Text + 8 Color Semi 4
+    --
+    --  A/S = D6
+    --  INT_EXT = 0
+    --  INV = D7
+    --  CSS = 8255
+    --  D = D(6), D(7), D(5:0)
+    --
+    --  10 = Multi Text
+    --
+    --  A/S = 0
+    --  INT_EXT = 0
+    --  INV = D7
+    --  CSS = D6
+    --  D = D(7:0)
+    --
+    --  11 = 4 Colour Semi 6
+    --
+    --  A/S = 1
+    --  INT_EXT = 1
+    --  INV = D7
+    --  CSS = 8255
+    --  D = D(7:0)
+  
+    mc6847_an_s <= doutb(6) when extensions(1) = '0' else extensions(0);
+    mc6847_intn_ext <= doutb(6) when extensions(1 downto 0) = "00" else (extensions(0) xnor extensions(1));
+    mc6847_inv <= doutb(7);
+    mc6847_d <= doutb(6) & doutb(7) & doutb(5 downto 0) when extensions(1 downto 0) = "01" else doutb;
+    mc6847_css <= doutb(6) xor css_masked when extensions(1 downto 0) = "10" else css_masked;
+    
     -- Clock1 is derived by dividing clock32 down by 32
     clock1 <= div32(4);
 
