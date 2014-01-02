@@ -391,10 +391,10 @@ begin
     -- Adjust the inputs to the 6847 based on the extensions register
     process (extensions, doutb, css_masked)
     begin
-        case extensions(1 downto 0) is
+        case extensions(2 downto 0) is
     
         -- Text plus 8 Colour Semigraphics 4
-        when "01" =>
+        when "001" =>
             mc6847_an_s <= doutb(6);
             mc6847_intn_ext <= '0';
             mc6847_inv <= doutb(7);
@@ -408,22 +408,88 @@ begin
             mc6847_css <= css_masked;              
 
         -- 2 Colour Text Only
-        when "10" =>
+        when "010" =>
             mc6847_an_s <= '0';
             mc6847_intn_ext <= '0';
             mc6847_inv <= doutb(7);
-            mc6847_d <= doutb;
+            if (ag_masked = '0' and doutb(6) = '1') then
+                mc6847_d <= "00" & doutb(5 downto 0);
+            else
+                mc6847_d <= doutb;
+            end if;
             mc6847_css <= doutb(6) xor css_masked;
 
         -- 4 Colour Semigraphics 6 Only
-        when "11" =>
+        when "011" =>
             mc6847_an_s <= '1';
             mc6847_intn_ext <= '1';
             mc6847_inv <= doutb(7);
             mc6847_d <= doutb;
             mc6847_css <= css_masked;
 
-        -- Default Atom Behaviour
+        -- Extended character set, lower case replaces Red Semigraphics
+        -- 00-3F - Normal Upper Case
+        -- 40-7F - Yellow Semigraphics 6
+        -- 80-BF - Inverse Upper Case
+        -- C0-FF - Normal Lower Case
+        when "100" =>
+            mc6847_an_s <= doutb(6) and not doutb(7);
+            mc6847_intn_ext <= doutb(6);
+            mc6847_inv <= not doutb(6) and doutb(7);
+            mc6847_d <= doutb;
+            mc6847_css <= css_masked;
+
+        -- Extended character set, lower case replaces Red and Yello Semigraphics
+        -- 00-3F - Normal Upper Case
+        -- 40-7F - Normal Lower Case
+        -- 80-BF - Inverse Upper Case
+        -- C0-FF - Inverse Lower Case
+        when "101" =>
+            mc6847_an_s <= '0';
+            mc6847_intn_ext <= '0';
+            mc6847_inv <= doutb(7);
+            mc6847_d <= doutb;
+            mc6847_css <= css_masked;
+
+        -- Extended character set, lower case replaces inverse
+        -- 00-3F - Normal Upper Case
+        -- 40-7F - Yellow Semigraphics 6 -- Blue
+        -- 80-BF - Normal Lower Case
+        -- C0-FF - Red Semigraphics 6 
+        when "110" =>
+            mc6847_an_s <= doutb(6);
+            mc6847_intn_ext <= doutb(6);
+            mc6847_inv <= '0';
+            if (ag_masked = '0' and doutb(7 downto 6) = "10") then
+                mc6847_d <= "01" & doutb(5 downto 0);
+            else
+                mc6847_d <= doutb;
+            end if;
+            mc6847_css <= css_masked;
+
+        -- Just replace inverse upper case (32 chars) with lower case    
+        -- 00-3F - Normal Upper Case
+        -- 40-7F - Yellow Semigraphics 6
+        -- 80-BF - Lower Case/Inverse Upper Case
+        -- C0-FF - Red Semigraphics 6
+
+        when "111" =>
+            mc6847_an_s <= doutb(6);
+            mc6847_intn_ext <= doutb(6);
+            mc6847_inv <= doutb(7) and doutb(5);
+            if (ag_masked = '0' and doutb(7 downto 5) = "100") then
+                mc6847_d <= "01" & doutb(5 downto 0);
+            else
+                mc6847_d <= doutb;
+            end if;
+            mc6847_css <= css_masked;
+
+        -- Default Atom Behaviour        
+        -- 00-3F - Normal Upper Case
+        -- 40-7F - Yellow Semigraphics 6
+        -- 80-BF - Inverse Upper Case
+        -- C0-FF - Red Semigraphics 6
+
         when others =>
             mc6847_an_s <= doutb(6);
             mc6847_intn_ext <= doutb(6);
