@@ -377,7 +377,7 @@ begin
             end if;
 
             -- generate character rom address
-            char_a <= '0' & dd(5 downto 0) & row_v(3 downto 0);
+            char_a <= dd(6 downto 0) & row_v(3 downto 0);
 
             -- DA0 high during FS
             if cvbs_vblank = '1' then
@@ -689,7 +689,7 @@ begin
     end process;
 
 ---- rom for char generator      
-    charrom_inst : entity work.mc6847_ntsc
+    charrom_inst : entity work.mc6847t1_ntsc_plus_keith
         port map(
             CLK  => clk,
             ADDR => char_a,

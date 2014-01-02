@@ -37,7 +37,7 @@ entity Top is
         --
         -- expept DA which is now input only
         -- except nRP which re-purposed as a nWR
-
+        
         CLK    : in    std_logic;
         DD     : inout std_logic_vector (7 downto 0);
         DA     : in    std_logic_vector (12 downto 0);
@@ -387,45 +387,54 @@ begin
             end if;
         end if;
     end process;
-
-    --  00 = Normal (Text + Semi 6)
-    --
-    --  A/S = D6
-    --  INT_EXT = D6
-    --  INV = D7
-    --  CSS = 8255
-    --  D = D(7:0)
-    --
-    --  01 = Text + 8 Color Semi 4
-    --
-    --  A/S = D6
-    --  INT_EXT = 0
-    --  INV = D7
-    --  CSS = 8255
-    --  D = D(6), D(7), D(5:0)
-    --
-    --  10 = Multi Text
-    --
-    --  A/S = 0
-    --  INT_EXT = 0
-    --  INV = D7
-    --  CSS = D6
-    --  D = D(7:0)
-    --
-    --  11 = 4 Colour Semi 6
-    --
-    --  A/S = 1
-    --  INT_EXT = 1
-    --  INV = D7
-    --  CSS = 8255
-    --  D = D(7:0)
-  
-    mc6847_an_s <= doutb(6) when extensions(1) = '0' else extensions(0);
-    mc6847_intn_ext <= doutb(6) when extensions(1 downto 0) = "00" else (extensions(0) xnor extensions(1));
-    mc6847_inv <= doutb(7);
-    mc6847_d <= doutb(6) & doutb(7) & doutb(5 downto 0) when extensions(1 downto 0) = "01" else doutb;
-    mc6847_css <= doutb(6) xor css_masked when extensions(1 downto 0) = "10" else css_masked;
     
+    -- Adjust the inputs to the 6847 based on the extensions register
+    process (extensions, doutb, css_masked)
+    begin
+        case extensions(1 downto 0) is
+    
+        -- Text plus 8 Colour Semigraphics 4
+        when "01" =>
+            mc6847_an_s <= doutb(6);
+            mc6847_intn_ext <= '0';
+            mc6847_inv <= doutb(7);
+            -- Replace the 64-127 and 192-255 blocks with Semigraphics 4
+            -- Only tweak the data bus when actually displaying semigraphics
+            if (ag_masked = '0' and doutb(6) = '1') then
+                mc6847_d <= '0' & doutb(7) & doutb(5 downto 0);
+            else
+                mc6847_d <= doutb;
+            end if;
+            mc6847_css <= css_masked;              
+
+        -- 2 Colour Text Only
+        when "10" =>
+            mc6847_an_s <= '0';
+            mc6847_intn_ext <= '0';
+            mc6847_inv <= doutb(7);
+            mc6847_d <= doutb;
+            mc6847_css <= doutb(6) xor css_masked;
+
+        -- 4 Colour Semigraphics 6 Only
+        when "11" =>
+            mc6847_an_s <= '1';
+            mc6847_intn_ext <= '1';
+            mc6847_inv <= doutb(7);
+            mc6847_d <= doutb;
+            mc6847_css <= css_masked;
+
+        -- Default Atom Behaviour
+        when others =>
+            mc6847_an_s <= doutb(6);
+            mc6847_intn_ext <= doutb(6);
+            mc6847_inv <= doutb(7);
+            mc6847_d <= doutb;
+            mc6847_css <= css_masked;
+        
+        end case;
+        
+    end process;
+  
     -- Clock1 is derived by dividing clock32 down by 32
     clock1 <= div32(4);
 
