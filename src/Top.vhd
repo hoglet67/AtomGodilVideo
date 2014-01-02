@@ -156,9 +156,17 @@ architecture BEHAVIORAL of Top is
     signal sid_di  : std_logic_vector (7 downto 0);
     signal sid_audio : std_logic;
 
-    -- Atom Extensions register
-    signal extensions : std_logic_vector (7 downto 0);
+    -- Atom extension register signals
+    signal reg_cs : std_logic;
+    signal reg_we : std_logic;
+    signal reg_addr  : std_logic_vector (4 downto 0);
+    signal reg_do  : std_logic_vector (7 downto 0);
+    signal reg_di  : std_logic_vector (7 downto 0);
 
+    signal extensions : std_logic_vector (7 downto 0);
+    signal char_addr : std_logic_vector (7 downto 0);
+    signal char_we : std_logic;
+    
     signal mc6847_an_s : std_logic;
     signal mc6847_intn_ext : std_logic;
     signal mc6847_inv : std_logic;
@@ -219,7 +227,11 @@ architecture BEHAVIORAL of Top is
             hblank         : out std_logic;
             vblank         : out std_logic;
             cvbs           : out std_logic_vector(7 downto 0);
-            black_backgnd  : in  std_logic
+            black_backgnd  : in  std_logic;
+            char_ram_clk   : in  std_logic;
+            char_ram_we    : in  std_logic;
+            char_ram_addr  : in  std_logic_vector(10 downto 0);
+            char_ram_di    : in  std_logic_vector(7 downto 0)
             );
     end component;
 
@@ -318,7 +330,12 @@ begin
             hblank         => open,
             vblank         => open,
             cvbs           => open,
-            black_backgnd  => BLACK_BACKGND
+            black_backgnd  => BLACK_BACKGND,
+            char_ram_clk   => clock32,
+            char_ram_we    => char_we,
+            char_ram_addr(10 downto 4) => char_addr(6 downto 0),
+            char_ram_addr(3 downto 0) => reg_addr(3 downto 0),
+            char_ram_di    => reg_di
             );
     
     -- 8Kx8 Dual port video RAM
@@ -382,14 +399,23 @@ begin
         if rising_edge(clock32) then
             if (nRST = '0') then
                 extensions <= (others => '0');
-            elsif (sid_cs = '1' and sid_we = '1' and sid_addr = "11111") then
-                extensions <= sid_di;
+                char_addr <= (others => '0');
+            elsif (reg_cs = '1' and reg_we = '1') then
+                case reg_addr is
+                -- extensions register
+                when "00000" =>
+                  extensions <= reg_di;
+                -- char_addr register
+                when "00001" =>
+                  char_addr <= reg_di;
+                when others =>
+                end case;
             end if;
         end if;
     end process;
     
     -- Adjust the inputs to the 6847 based on the extensions register
-    process (extensions, doutb, css_masked)
+    process (extensions, doutb, css_masked, ag_masked)
     begin
         case extensions(2 downto 0) is
     
@@ -510,9 +536,23 @@ begin
     dina  <= DD2;
     addra <= DA2;
     
+    -- Signals driving the internal registers
+    -- When nSIDD=0 the registers are mapped to BDE0-BDFF
+    -- When nSIDD=1 the registers are mapped to 9EC0-9EFF
+    reg_cs <= '1' when (nSIDD = '1' and nMS2 = '0' and DA2(12 downto 5) =  "11111110") or
+                       (nSIDD = '0' and nBXXX2 = '0' and DA2(11 downto 5) = "1101111") 
+                  else '0';
+
+    reg_we <= '1' when (nSIDD = '1' and nWRMS1 = '1' and nWRMS2 = '0') or
+                       (nSIDD = '0' and nWR1 = '1' and nWR2 = '0')
+                  else '0';
+
+    reg_di <= DD2;
+    reg_addr <= DA2(4 downto 0);
+
     -- Signals driving the SID
-    -- Kees's Atom SID is at BDC0-BDDF
-    -- This one will be at 9DC0-9DDF
+    -- When nSIDD=0 the SID is mapped to BDC0-BDCF
+    -- When nSIDD=1 the SID is mapped to 9EF0-9FFF
     sid_cs <= '1' when (nSIDD = '1' and nMS2 = '0' and DA2(12 downto 5) =  "11111111") or
                        (nSIDD = '0' and nBXXX2 = '0' and DA2(11 downto 5) = "1101110") 
                   else '0';
@@ -521,6 +561,7 @@ begin
                        (nSIDD = '0' and nWR1 = '1' and nWR2 = '0')
                   else '0';
 
+    char_we <= '1' when reg_cs = '1' and reg_we = '1' and char_addr(7) = '1' and reg_addr(4) = '1' else '0';
     sid_di <= DD2;
     sid_addr <= DA2(4 downto 0);
     

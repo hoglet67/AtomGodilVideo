@@ -35,7 +35,11 @@ entity mc6847 is
             artifact_set   : in  std_logic;
             artifact_phase : in  std_logic;
             cvbs           : out std_logic_vector(7 downto 0);
-            black_backgnd  : in  std_logic
+            black_backgnd  : in  std_logic;
+            char_ram_clk   : in  std_logic;
+            char_ram_we    : in  std_logic;
+            char_ram_addr  : in  std_logic_vector(10 downto 0);
+            char_ram_di    : in  std_logic_vector(7 downto 0)
             );
 end mc6847;
 
@@ -689,11 +693,26 @@ begin
     end process;
 
 ---- rom for char generator      
-    charrom_inst : entity work.mc6847t1_ntsc_plus_keith
+--    charrom_inst : entity work.mc6847t1_ntsc_plus_keith
+--        port map(
+--            CLK  => clk,
+--            ADDR => char_a,
+--            DATA => char_d_o
+--            );
+
+---- ram for char generator      
+    charrom_inst : entity work.CharRam
         port map(
-            CLK  => clk,
-            ADDR => char_a,
-            DATA => char_d_o
-            );
+            clka  => char_ram_clk,
+            wea   => char_ram_we,
+            addra => char_ram_addr,
+            dina  => char_ram_di,
+            douta => open,
+            clkb  => clk,
+            web   => '0',
+            addrb => char_a,
+            dinb  => (others => '0'),
+            doutb => char_d_o
+        );
 
 end SYN;
