@@ -95,7 +95,6 @@ architecture SYN of mc6847 is
     signal inv_s      : std_logic;
 
     -- VGA signals
-    signal vga_clk_ena      : std_logic;
     signal vga_hsync        : std_logic;
     signal vga_vsync        : std_logic;
     signal vga_hblank       : std_logic;
@@ -216,7 +215,6 @@ begin
                 cvbs_clk_ena <= toggle;
                 toggle       := not toggle;
             end if;
-            vga_clk_ena <= clk_ena;
         end if;
     end process PROC_CLOCKS;
 
@@ -233,7 +231,7 @@ begin
             vga_vsync  <= '1';
             vga_hblank <= '0';
             
-        elsif rising_edge (clk) and vga_clk_ena = '1' then
+        elsif rising_edge (clk) and clk_ena = '1' then
 
             -- start hsync when cvbs comes out of vblank
             if vga_vblank_r = '1' and vga_vblank = '0' then
@@ -619,7 +617,7 @@ begin
                     end if;
                 end if;
             else
-                if vga_clk_ena = '1' then
+                if clk_ena = '1' then
                     if vga_hblank = '1' then
                         count := '0';
                         p_in  := (others => '0');
@@ -684,7 +682,9 @@ begin
                     VRAM(conv_integer(cvbs_linebuf_addr_rr(8 downto 0))) <= pixel_char_d_o;
                 end if;
             end if;
-            vga_char_d_o <= VRAM(conv_integer(vga_linebuf_addr(8 downto 0)));
+            if clk_ena = '1' then
+                vga_char_d_o <= VRAM(conv_integer(vga_linebuf_addr(8 downto 0)));
+            end if;
         end if;
     end process;
 

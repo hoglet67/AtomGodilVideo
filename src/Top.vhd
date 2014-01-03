@@ -382,7 +382,7 @@ begin
 		reset => reset,
 		clk25MHz => clock25,
 		TEXT_A => vga80_addrb,
-		TEXT_D => doutb,
+		TEXT_D => mc6847_d,
 		FONT_A(10 downto 0) => vga80_char_a,
 		FONT_A(11) => vga80_invert,
 		FONT_D => vga80_char_d,
