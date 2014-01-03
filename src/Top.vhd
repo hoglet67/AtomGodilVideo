@@ -94,8 +94,9 @@ architecture BEHAVIORAL of Top is
     -- Set this to 1 if you want black background on text (authentic Atom)
     constant BLACK_BACKGND : std_logic := '1';
 
-    -- Clock12 is a half speed VGA clock
-    signal clock12 : std_logic;
+    -- clock25 is a full speed VGA clock
+    signal clock25 : std_logic;
+    signal clock25en : std_logic;
     
     -- Other clocks are for SID
     -- 1MHZ, 32MHz and 
@@ -165,6 +166,9 @@ architecture BEHAVIORAL of Top is
 
     signal extensions : std_logic_vector (7 downto 0);
     signal char_addr : std_logic_vector (7 downto 0);
+    signal ocrx : std_logic_vector (7 downto 0);
+    signal ocry : std_logic_vector (7 downto 0);
+    signal octl : std_logic_vector (7 downto 0);
     signal char_we : std_logic;
     
     signal mc6847_an_s : std_logic;
@@ -172,7 +176,29 @@ architecture BEHAVIORAL of Top is
     signal mc6847_inv : std_logic;
     signal mc6847_css : std_logic;
     signal mc6847_d : std_logic_vector (7 downto 0);
-
+    signal mc6847_char_a : std_logic_vector (10 downto 0);
+    signal mc6847_addrb : std_logic_vector (12 downto 0);
+    signal char_d_o : std_logic_vector (7 downto 0);
+    
+    signal vga80x40mode  : std_logic;
+    signal final_red     : std_logic;
+    signal final_green1  : std_logic;
+    signal final_green0  : std_logic;
+    signal final_blue    : std_logic;
+    signal final_vsync   : std_logic;
+    signal final_hsync   : std_logic;
+    signal final_char_a  : std_logic_vector (10 downto 0);
+    
+    signal vga80_R       : std_logic;
+    signal vga80_G       : std_logic;
+    signal vga80_B       : std_logic;
+    signal vga80_vsync   : std_logic;
+    signal vga80_hsync   : std_logic;
+    signal vga80_invert  : std_logic;
+    signal vga80_char_a  : std_logic_vector (10 downto 0);
+    signal vga80_char_d  : std_logic_vector (7 downto 0);
+    signal vga80_addrb   : std_logic_vector (11 downto 0);
+    
     component DCM0
         port(
             CLKIN_IN  : in  std_logic;
@@ -199,6 +225,25 @@ architecture BEHAVIORAL of Top is
             CLK2X_OUT : out std_logic
             );
     end component;
+
+	component vga80x40
+        port(
+            reset : IN std_logic;
+            clk25MHz : IN std_logic;
+            TEXT_D : IN std_logic_vector(7 downto 0);
+            FONT_D : IN std_logic_vector(7 downto 0);
+            ocrx : IN std_logic_vector(7 downto 0);
+            ocry : IN std_logic_vector(7 downto 0);
+            octl : IN std_logic_vector(7 downto 0);          
+            TEXT_A : OUT std_logic_vector(11 downto 0);
+            FONT_A : OUT std_logic_vector(11 downto 0);
+            R : OUT std_logic;
+            G : OUT std_logic;
+            B : OUT std_logic;
+            hsync : OUT std_logic;
+            vsync : OUT std_logic
+            );
+	end component;
 
     component mc6847
         port(
@@ -228,10 +273,8 @@ architecture BEHAVIORAL of Top is
             vblank         : out std_logic;
             cvbs           : out std_logic_vector(7 downto 0);
             black_backgnd  : in  std_logic;
-            char_ram_clk   : in  std_logic;
-            char_ram_we    : in  std_logic;
-            char_ram_addr  : in  std_logic_vector(10 downto 0);
-            char_ram_di    : in  std_logic_vector(7 downto 0)
+            char_a         : out std_logic_vector(10 downto 0);
+            char_d_o       : in std_logic_vector(7 downto 0)
             );
     end component;
 
@@ -278,7 +321,7 @@ begin
     Inst_DCM0 : DCM0
         port map (
             CLKIN_IN  => clock49,
-            CLK0_OUT  => clock12,
+            CLK0_OUT  => clock25,
             CLK0_OUT1 => open,
             CLK2X_OUT => open
             );
@@ -305,11 +348,11 @@ begin
     -- A further few bugs fixed by myself
     Inst_mc6847 : mc6847
         port map (
-            clk            => clock12,
-            clk_ena        => '1',
+            clk            => clock25,
+            clk_ena        => clock25en,
             reset          => reset,
             da0            => open,
-            videoaddr      => addrb,
+            videoaddr      => mc6847_addrb,
             dd             => mc6847_d,
             hs_n           => open,
             fs_n           => nFS,
@@ -331,13 +374,46 @@ begin
             vblank         => open,
             cvbs           => open,
             black_backgnd  => BLACK_BACKGND,
-            char_ram_clk   => clock32,
-            char_ram_we    => char_we,
-            char_ram_addr(10 downto 4) => char_addr(6 downto 0),
-            char_ram_addr(3 downto 0) => reg_addr(3 downto 0),
-            char_ram_di    => reg_di
+            char_a         => mc6847_char_a,
+            char_d_o       => char_d_o
             );
-    
+
+	Inst_vga80x40: vga80x40 PORT MAP(
+		reset => reset,
+		clk25MHz => clock25,
+		TEXT_A => vga80_addrb,
+		TEXT_D => doutb,
+		FONT_A(10 downto 0) => vga80_char_a,
+		FONT_A(11) => vga80_invert,
+		FONT_D => vga80_char_d,
+		ocrx => ocrx,
+		ocry => ocry,
+		octl => octl,
+		R => vga80_R,
+		G => vga80_G,
+		B => vga80_B,
+		hsync => vga80_hsync,
+		vsync => vga80_vsync 
+	);
+
+    vga80_char_d <= char_d_o when vga80_invert='0' else char_d_o xor "11111111"; 
+    ---- ram for char generator      
+    charrom_inst : entity work.CharRam
+        port map(
+            clka  => clock32,
+            wea   => char_we,
+            addra(10 downto 4) => char_addr(6 downto 0),
+            addra(3 downto 0) => reg_addr(3 downto 0),
+            dina  => reg_di,
+            douta => open,
+            clkb  => clock25,
+            web   => '0',
+            addrb => final_char_a,
+            dinb  => (others => '0'),
+            doutb => char_d_o
+        );
+
+
     -- 8Kx8 Dual port video RAM
     -- Port A connects to Atom and is read/write
     -- Port B connects to MC6847 and is read only    
@@ -348,7 +424,7 @@ begin
             addra => addra,
             dina  => dina,
             douta => douta,
-            clkb  => clock12,
+            clkb  => clock25,
             web   => '0',
             addrb => addrb,
             dinb  => (others => '0'),
@@ -371,7 +447,7 @@ begin
             audio_out => sid_audio,
             audio_data => open 
         );
-
+    
 
     -- Pipelined version of address/data/write signals
     process (clock32)
@@ -400,6 +476,9 @@ begin
             if (nRST = '0') then
                 extensions <= (others => '0');
                 char_addr <= (others => '0');
+                ocrx <= (others => '0');
+                ocry <= (others => '0');
+                octl <= "11110111";
             elsif (reg_cs = '1' and reg_we = '1') then
                 case reg_addr is
                 -- extensions register
@@ -408,6 +487,12 @@ begin
                 -- char_addr register
                 when "00001" =>
                   char_addr <= reg_di;
+                when "00010" =>
+                  ocrx <= reg_di;
+                when "00011" =>
+                  ocry <= reg_di;
+                when "00100" =>
+                  octl <= reg_di;
                 when others =>
                 end case;
             end if;
@@ -572,29 +657,41 @@ begin
     -- Output the SID Select Signal so it can be used to disable the bus buffers
 
     nSIDSEL <= not sid_cs;
-    
-    -- 1 Bit RGB Video to PL4 Connectors
-    OA  <= vga_red(7)    when nPL4 = '0' else '0';
-    CHB <= vga_green(7)  when nPL4 = '0' else '0';
-    OB  <= vga_blue(7)   when nPL4 = '0' else '0';
-    nHS <= vga_hsync     when nPL4 = '0' else '0';
-    Y   <= vga_vsync     when nPL4 = '0' else '0';
 
+    -- VGA Multiplexing between two controllers
+    
+    vga80x40mode <= extensions(7);
+    final_red    <= vga_red(7)    when vga80x40mode = '0' else vga80_R;
+    final_green1 <= vga_green(7)  when vga80x40mode = '0' else vga80_G;
+    final_green0 <= vga_green(6)  when vga80x40mode = '0' else vga80_G;
+    final_blue   <= vga_blue(7)   when vga80x40mode = '0' else vga80_B;
+    final_vsync  <= vga_vsync     when vga80x40mode = '0' else vga80_vsync;
+    final_hsync  <= vga_hsync     when vga80x40mode = '0' else vga80_hsync;
+    final_char_a <= mc6847_char_a when vga80x40mode = '0' else vga80_char_a;
+    addrb        <= mc6847_addrb  when vga80x40mode = '0' else '0' & vga80_addrb;
+    -- 1 Bit RGB Video to PL4 Connectors
+    OA  <= final_red    when nPL4 = '0' else '0';
+    CHB <= final_green1 when nPL4 = '0' else '0';
+    OB  <= final_blue   when nPL4 = '0' else '0';
+    nHS <= final_hsync  when nPL4 = '0' else '0';
+    Y   <= final_vsync  when nPL4 = '0' else '0';
+    
     -- RGB mapping
-    R(0) <= vga_red(7);
-    G(1) <= vga_green(7);
-    G(0) <= vga_green(6);
-    B(0) <= vga_blue(7);
-    VSYNC <= vga_vsync;
-    HSYNC <= vga_hsync;
+    R(0)  <= final_red;
+    G(1)  <= final_green1;
+    G(0)  <= final_green0;
+    B(0)  <= final_blue;
+    VSYNC <= final_vsync;
+    HSYNC <= final_hsync;
+    
     AUDIO <= sid_audio;
 
     -- Hold internal reset low for two frames after nRST released
     -- This avoids any diaplay glitches
-    process (Clock12)
+    process (clock25)
     variable state : std_logic_vector(2 downto 0);
     begin
-        if rising_edge(Clock12) then
+        if rising_edge(clock25) then
             if (nRST = '0') then
                 state := "000";
             elsif (state = "000" and vga_vsync = '0') then
@@ -609,6 +706,14 @@ begin
             mask <= state(2);
         end if;
     end process;
+    
+   process (clock25)
+    begin
+        if rising_edge(clock25) then
+            clock25en <= not clock25en;
+        end if;
+    end process;
+    
     
     -- During reset, force the 6847 mode select inputs low
     -- (this is necessary to stop the mode changing during reset, as the GODIL has 1.5K pullups)

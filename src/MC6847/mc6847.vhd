@@ -36,10 +36,8 @@ entity mc6847 is
             artifact_phase : in  std_logic;
             cvbs           : out std_logic_vector(7 downto 0);
             black_backgnd  : in  std_logic;
-            char_ram_clk   : in  std_logic;
-            char_ram_we    : in  std_logic;
-            char_ram_addr  : in  std_logic_vector(10 downto 0);
-            char_ram_di    : in  std_logic_vector(7 downto 0)
+            char_a         : out std_logic_vector(10 downto 0);
+            char_d_o       : in std_logic_vector(7 downto 0)
             );
 end mc6847;
 
@@ -131,8 +129,6 @@ architecture SYN of mc6847 is
     signal da0_int : std_logic_vector(4 downto 0);
 
     -- character rom signals
-    signal char_a               : std_logic_vector(10 downto 0);
-    signal char_d_o             : std_logic_vector(7 downto 0);
     signal cvbs_linebuf_we_r    : std_logic;
     signal cvbs_linebuf_addr_r  : std_logic_vector(8 downto 0);
     signal cvbs_linebuf_we_rr   : std_logic;
@@ -699,20 +695,5 @@ begin
 --            ADDR => char_a,
 --            DATA => char_d_o
 --            );
-
----- ram for char generator      
-    charrom_inst : entity work.CharRam
-        port map(
-            clka  => char_ram_clk,
-            wea   => char_ram_we,
-            addra => char_ram_addr,
-            dina  => char_ram_di,
-            douta => open,
-            clkb  => clk,
-            web   => '0',
-            addrb => char_a,
-            dinb  => (others => '0'),
-            doutb => char_d_o
-        );
 
 end SYN;
