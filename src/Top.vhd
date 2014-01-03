@@ -478,7 +478,7 @@ begin
                 char_addr <= (others => '0');
                 ocrx <= (others => '0');
                 ocry <= (others => '0');
-                octl <= "11110111";
+                octl <= "10000010";
             elsif (reg_cs = '1' and reg_we = '1') then
                 case reg_addr is
                 -- extensions register

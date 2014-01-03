@@ -7,6 +7,7 @@ L00E3   = $00E3
 L00E4   = $00E4
 L00E5   = $00E5
 L00E6   = $00E6
+L00E7   = $00E7
 L00FB   = $00FB
 
 IO8255_0 = $B000
@@ -47,8 +48,8 @@ ENDIF
 SCREEN = $8000
 SCREENEND = SCREEN + (NUMROWS - 1) * NUMCOLS
 
-LFE4A = $fe71
 WRCVEC = $0208
+RDCVEC = $020A
 
 	org LOAD - 22
 .AtmHeader
@@ -67,8 +68,22 @@ WRCVEC = $0208
 	STA	WRCVEC
 	LDA    #>LFE2B
 	STA	WRCVEC+1
+	LDA    #<LFE6D
+	STA	RDCVEC
+	LDA    #>LFE6D
+	STA	RDCVEC+1
+
+	LDA	#$80
+	STA	$BDE0
+	LDA	#12
+	JSR	$FFF4
+	
 	RTS
 
+.LF5DA
+        JSR     LF8AB
+
+        JMP     LFE9E
 .LF5E0
         STY     L00DE
         JSR     LF8AB
@@ -108,10 +123,13 @@ WRCVEC = $0208
         LDX     #$0A
         JSR     LFE9E
 
-        BNE     LFD02
+        BNE     LXX
 
         JMP     LFE90
-
+.LXX
+	JMP	LFD02
+	
+	
 .LFCE0
         CLC
         LDX     #$00
@@ -144,6 +162,73 @@ WRCVEC = $0208
         PLP
         RTS
 
+.CLEARMORE
+
+.LFDF2A
+        LDA     SCREEN+$200,Y
+        STA     SCREEN+$200-NUMCOLS,Y
+        INY
+        BNE     LFDF2A
+.LFDF2B
+        LDA     SCREEN+$300,Y
+        STA     SCREEN+$300-NUMCOLS,Y
+        INY
+        BNE     LFDF2B
+.LFDF2C
+        LDA     SCREEN+$400,Y
+        STA     SCREEN+$400-NUMCOLS,Y
+        INY
+        BNE     LFDF2C
+.LFDF2D
+        LDA     SCREEN+$500,Y
+        STA     SCREEN+$500-NUMCOLS,Y
+        INY
+        BNE     LFDF2D
+.LFDF2E
+        LDA     SCREEN+$600,Y
+        STA     SCREEN+$600-NUMCOLS,Y
+        INY
+        BNE     LFDF2E
+.LFDF2F
+        LDA     SCREEN+$700,Y
+        STA     SCREEN+$700-NUMCOLS,Y
+        INY
+        BNE     LFDF2F
+.LFDF2G
+        LDA     SCREEN+$800,Y
+        STA     SCREEN+$800-NUMCOLS,Y
+        INY
+        BNE     LFDF2G
+.LFDF2H
+        LDA     SCREEN+$900,Y
+        STA     SCREEN+$900-NUMCOLS,Y
+        INY
+        BNE     LFDF2H
+.LFDF2I
+        LDA     SCREEN+$a00,Y
+        STA     SCREEN+$a00-NUMCOLS,Y
+        INY
+        BNE     LFDF2I
+.LFDF2J
+        LDA     SCREEN+$b00,Y
+        STA     SCREEN+$b00-NUMCOLS,Y
+        INY
+        BNE     LFDF2J
+.LFDF2K
+        LDA     SCREEN+$c00,Y
+        STA     SCREEN+$c00-NUMCOLS,Y
+        INY
+        BNE     LFDF2K
+
+	RTS
+
+
+.LFD00
+	
+	org (LFD00 + $ff) AND $ff00
+	
+;; Needs to be page aligned
+	
         NOP
 .LFD02
         CMP     #$20
@@ -247,6 +332,71 @@ ENDIF
 
         JMP     LFD1D
 
+.LFD73
+        LDA     L00E7
+        EOR     #$60
+        STA     L00E7
+        BCS     LFD84
+
+.LFD7B
+        AND     #$05
+        ROL     IO8255_1
+        ROL     A
+        JSR     LFCBF
+
+.LFD84
+        JMP     LFE73
+
+.LFD87
+        LDY     L00E0
+        JSR     LFE44
+
+        LDA     (L00DE),Y
+        EOR     L00E1
+        BMI     LFD94
+
+        EOR     #$60
+.LFD94
+        SBC     #$20
+        JMP     LFDC2
+
+.LFD99
+        LDA     #$5F
+.LFD9B
+        EOR     #$20
+        BNE     LFDC2
+
+.LFD9F
+        EOR     L00E7
+.LFDA1
+        BIT     IO8255_1
+        BMI     LFDA8
+
+        EOR     #$60
+.LFDA8
+        JMP     LFDB8
+
+.LFDAB
+        ADC     #$39
+        BCC     LFDA1
+
+.LFDAF
+        EOR     #$10
+.LFDB1
+        BIT     IO8255_1
+        BMI     LFDB8
+
+        EOR     #$10
+.LFDB8
+        CLC
+        ADC     #$20
+.LFDBB
+        BIT     IO8255_1
+        BVS     LFDC2
+
+        AND     #$1F
+.LFDC2
+        JMP     LFE39
 
 .LFDC5
         LDY     L00E6
@@ -365,6 +515,69 @@ ENDIF
 
         RTS
 
+
+.LFE4A
+        LDY     #$3B
+        CLC
+        LDA     #$20
+.LFE4F
+        LDX     #$0A
+.LFE51
+        BIT     IO8255_1
+        BEQ     LFE5E
+
+        INC     IO8255_0
+        DEY
+        DEX
+        BNE     LFE51
+
+        LSR     A
+.LFE5E
+        PHP
+        PHA
+        LDA     IO8255_0
+        AND     #$F0
+        STA     IO8255_0
+        PLA
+        PLP
+        BNE     LFE4F
+
+        RTS
+
+.LFE6D
+        PHP
+        CLD
+        STX     L00E4
+        STY     L00E5
+.LFE73
+        BIT     IO8255_2
+        BVC     LFE7D
+
+        JSR     LFE4A
+
+        BCC     LFE73
+
+.LFE7D
+        JSR     LFF79
+
+.LFE80
+        JSR     LFE4A
+
+        BCS     LFE80
+
+        JSR     LFE4A
+
+        BCS     LFE80
+
+.LFE8A
+        TYA
+        LDX     #$17
+        JSR     LF5DA
+
+
+
+
+
 .LFE90
         LDA     LFEBC,X
         STA     L00E2
@@ -385,7 +598,8 @@ ENDIF
          EQUB    $00
 
 .LFEA5
-         EQUB    $08,$09,$0A,$0B,$0C,$0D,$0E,$0F,$1E,$7F
+        EQUB    $08,$09,$0A,$0B,$0C,$0D,$0E,$0F,$1E,$7F
+        EQUB    $00,$01,$05,$06,$08,$0E,$0F,$10,$11,$1C,$20,$21,$3B
 
 	
 .LFEBC
@@ -400,6 +614,19 @@ ENDIF
         EQUB <LFD6B
         EQUB <LFD56
         EQUB <LFD29
+        EQUB <LFDB8
+        EQUB <LFDAB
+        EQUB <LFD73
+        EQUB <LFD7B
+        EQUB <LFDBB
+        EQUB <LFD87
+        EQUB <LFD99
+        EQUB <LFDB8
+        EQUB <LFDB1
+        EQUB <LFDAF
+        EQUB <LFDA1
+        EQUB <LFD9F
+        EQUB <LFD9B
 
 .LFED4
         PHA
@@ -447,65 +674,22 @@ ENDIF
         AND     #$F0
         BCS     LFF0C
 
-.CLEARMORE
 
-.LFDF2A
-        LDA     SCREEN+$200,Y
-        STA     SCREEN+$200-NUMCOLS,Y
-        INY
-        BNE     LFDF2A
-.LFDF2B
-        LDA     SCREEN+$300,Y
-        STA     SCREEN+$300-NUMCOLS,Y
-        INY
-        BNE     LFDF2B
-.LFDF2C
-        LDA     SCREEN+$400,Y
-        STA     SCREEN+$400-NUMCOLS,Y
-        INY
-        BNE     LFDF2C
-.LFDF2D
-        LDA     SCREEN+$500,Y
-        STA     SCREEN+$500-NUMCOLS,Y
-        INY
-        BNE     LFDF2D
-.LFDF2E
-        LDA     SCREEN+$600,Y
-        STA     SCREEN+$600-NUMCOLS,Y
-        INY
-        BNE     LFDF2E
-.LFDF2F
-        LDA     SCREEN+$700,Y
-        STA     SCREEN+$700-NUMCOLS,Y
-        INY
-        BNE     LFDF2F
-.LFDF2G
-        LDA     SCREEN+$800,Y
-        STA     SCREEN+$800-NUMCOLS,Y
-        INY
-        BNE     LFDF2G
-.LFDF2H
-        LDA     SCREEN+$900,Y
-        STA     SCREEN+$900-NUMCOLS,Y
-        INY
-        BNE     LFDF2H
-.LFDF2I
-        LDA     SCREEN+$a00,Y
-        STA     SCREEN+$a00-NUMCOLS,Y
-        INY
-        BNE     LFDF2I
-.LFDF2J
-        LDA     SCREEN+$b00,Y
-        STA     SCREEN+$b00-NUMCOLS,Y
-        INY
-        BNE     LFDF2J
-.LFDF2K
-        LDA     SCREEN+$c00,Y
-        STA     SCREEN+$c00-NUMCOLS,Y
-        INY
-        BNE     LFDF2K
+.LFF79
+        LDX     #$64
+.LFF7B
+        LDY     #$C7
+.LFF7D
+        DEY
+        BNE     LFF7D
 
-	RTS
+        DEX
+        BNE     LFF7B
+
+        RTS
+
+
+	
 	
 .BeebDisEndAddr
 
