@@ -42,6 +42,7 @@ LFDE2 = $FDE2
 ; Flyback
 LFE66 = $FE66
 LFE6B = $FE6B
+
 	
 	org 	LOAD - 22
 
@@ -53,12 +54,24 @@ LFE6B = $FE6B
         EQUW    BeebDisStartAddr
         EQUW	BeebDisEndAddr - BeebDisStartAddr
 
-
         org     LOAD
 
 .BeebDisStartAddr
 
-	JMP Initialize
+.Initialize
+	LDA    #<oswrch
+	STA	WRCVEC
+	LDA    #>oswrch
+	STA	WRCVEC+1
+	LDA    #<osrdch
+	STA	RDCVEC
+	LDA    #>osrdch
+	STA	RDCVEC+1
+
+	LDA	#$80
+	STA	$BDE0
+	LDA	#12
+	JMP	$FFF4
 
 	
 ;    Send ASCII Character to Screen subroutine
@@ -99,9 +112,7 @@ LFE6B = $FE6B
 ;  - Clears the NAK flag (bit 7 of #E0).
 
 
-.LFD0B  clc			; ..to clear NAK flag
-        ldx     #$00		;
-        stx     $B000		; Reset the VDG to alphanumeric mode
+.LFD0B 	jmp $fd0b
 
 ;    Handle <ACK> or <NAK> subroutine
 ;    --------------------------------
@@ -110,28 +121,16 @@ LFE6B = $FE6B
 ;           Carry  set  to perform <ACK>
 ;  - Returns with Accumulator and Y registers preserved, and with X=2.
 ;  
-.LFD11  ldx     #$02		; 
-.LFD13  php			; Save state of Carry flag
-        asl     $DE, x		; Get rid of old NAK flag (bit 7)
-        plp			; Restore state of Carry flag
-        ror     $DE, x		; ..and shift in the new NAK flag value
-.LFD19  rts			;
+.LFD11	jmp	$fd11
+
+.LFD19  rts
 
 ;    Handle <BEL> subroutine
 ;    -----------------------
 ;  
 ;  - Returns with X=0, Y=128, and the sign flag set.
 
-.LFD1A  lda     #$05		; Get control code to set 8255 PIA port bits
-				; C0-C3 to input; A, B, and C4-C7 to output
-        tay			; Set up outer loop counter
-.LFD1D  sta     $B003		; Set port C0-C3 to input, so speaker O/P=1
-.LFD20  dex			; )
-        bne     LFD20		; ) ..a short delay
-        eor     #$01		; Toggle C0-C3 between input and output
-        iny			; Increment outer loop counter
-        bpl     LFD1D		; ..continue for 122 outer loop cycles
-        rts			; 
+.LFD1A	jmp	$fd1a
 
 ;    Print an ASCII Character on the Screen subroutine
 ;    -------------------------------------------------
@@ -169,13 +168,7 @@ LFE6B = $FE6B
 ;    ?#E1.
 ;  - A, X, Y registers preserved.
 
-.LFD44  pha			; Save character in accumulator
-        jsr     LFE6B		; Wait for the next or current flyback
-        lda     ($DE),y		; Get character at current print position
-        eor     $E1		; Mask it
-        sta     ($DE),y		; ..and return it to the screen
-        pla			; Restore character to accumulator
-        rts			;
+.LFD44	jmp	 $fd44
 
 ;    Handle <DEL> subroutine
 ;    -----------------------
@@ -228,11 +221,7 @@ ENDIF
 ;  
 ;  - Sets cursor to top left position.
 
-.LFD7D  lda     #>SCREEN	; 
-        ldy     #$00		; Clear current cursor position
-        sta     $DF		; ) Set line start address to the top of 
-        sty     $DE		; ) the screen at #8000
-        beq     LFD42		; Update cursor position and invert cursor
+.LFD7D  jmp	$fd7d
 
 ;    Handle <VT> subroutine
 ;    ----------------------
@@ -257,10 +246,7 @@ ENDIF
 ;  - Turns page mode off.
 ;  - Enter with Carry set.
 
-.LFD92  ldx     #$08		; 
-        jsr     LFD13		; Set or clear bit 7 of #E6 according to carry
-        jmp     LFD44		; Invert character at current position
-
+.LFD92  jmp	$fd92
 
 ;    Handle Cursor Keys from Keyboard subroutine
 ;    -------------------------------------------
@@ -628,23 +614,6 @@ ENDIF
 
 	RTS
 	
-.Initialize
-	LDA    #<oswrch
-	STA	WRCVEC
-	LDA    #>oswrch
-	STA	WRCVEC+1
-	LDA    #<osrdch
-	STA	RDCVEC
-	LDA    #>osrdch
-	STA	RDCVEC+1
-
-	LDA	#$80
-	STA	$BDE0
-	LDA	#12
-	JSR	$FFF4
-	
-	RTS
-
 
 .BeebDisEndAddr
 
