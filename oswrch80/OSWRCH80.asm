@@ -16,10 +16,39 @@ SCREENEND = SCREEN + (NUMROWS - 1) * NUMCOLS
 WRCVEC = $0208
 RDCVEC = $020A
 
-	org LOAD - 22
+; Send character in accumulator to the VIA
+LFEFB = $FEFB
+
+; Wait 0.1 second for debounce
+LFB8A = $fB8A
+	
+; Scan keyboard	
+LFE71 = $FE71
+
+; Keyboard Control Code Handlers
+; use Kernel for all except cursor handling (FDA2)
+LFD9A = $FD9A
+LFDAE = $FDAE
+LFDC0 = $FDC0
+LFDC2 = $FDC2
+LFDC6 = $FDC6
+LFDC8 = $FDC8
+LFDD2 = $FDD2
+LFDD6 = $FDD6
+LFDD8 = $FDD8
+LFDDF = $FDDF
+LFDE2 = $FDE2
+
+; Flyback
+LFE66 = $FE66
+LFE6B = $FE6B
+	
+	org 	LOAD - 22
+
 .AtmHeader
         EQUS    "OSWRCH80"
-        org AtmHeader + 16
+	
+        org 	AtmHeader + 16
         EQUW	BeebDisStartAddr
         EQUW    BeebDisStartAddr
         EQUW	BeebDisEndAddr - BeebDisStartAddr
@@ -232,17 +261,6 @@ ENDIF
         jsr     LFD13		; Set or clear bit 7 of #E6 according to carry
         jmp     LFD44		; Invert character at current position
 
-;    Handle <LOCK> subroutine
-;    ------------------------
-;  
-;  - Toggles the lock flag - #E7 = #60 Lock on
-;                            #E7 =   0 Lock off
-;  - Enter with Carry set.
-
-.LFD9A  lda     $E7		; Get the lock flag
-        eor     #$60		; ..toggle it
-        sta     $E7		; ..and restore it
-        bcs     LFDAB		; Go fetch another keypress
 
 ;    Handle Cursor Keys from Keyboard subroutine
 ;    -------------------------------------------
@@ -255,81 +273,6 @@ ENDIF
         jsr     LFCEA		; Send control character to screen
 .LFDAB  jmp     LFE9A		; ..and fetch another key
  
-;    Handle <COPY> Key subroutine
-;    ----------------------------
-
-.LFDAE  ldy     $E0		; Get the current cursor position
-        jsr     LFE6B		; Wait for the next or current flyback
-        lda     ($DE),y		; Get character at current cursor position
-        eor     $E1		; Get rid of the cursor mask
-        bmi     LFDBB		; )
-        eor     #$60		; )
-.LFDBB  sbc     #$20		; ) Convert screen character to ASCII
-        jmp     LFDE9		; Restore A,X,Y regs & status & return
-
-;    Handle <DEL> key #F (ASCII #7F) subroutine
-;    ------------------------------------------
-
-.LFDC0  lda     #$5F		; 
-
-;    Handle '[\]^_' keys #3B-#3F (ASCII #5B-#5F) subroutine
-;    ------------------------------------------------------
-;  
-;  - Enter with accumulator = key number = #20 - ASCII value.
-
-.LFDC2  eor     #$20		;
-        bne     LFDE9		;
-
-;    Handle 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' keys #21-#3A (ASCII #41-#5A) sub
-;    --------------------------------------------------------------------
-;  
-;  - Enter with accumulator = key number = #20 - ASCII value.
-
-.LFDC6  eor     $E7		; Invert if lock flag set to #60
-
-;    Handle '@' key #20 (ASCII #40) subroutine
-;    -----------------------------------------
-
-.LFDC8  bit     $B001		; Is the shift key being pressed ?
-        bmi     LFDCF		; ..no, don't invert the character
-        eor     #$60		; ..yes, invert the character
-.LFDCF  jmp     LFDDF		; Convert to ASCII & test for <CTRL> key
-
-;    Handle '!"#$' keys 1-4 (ASCII #21-#24) subroutine
-;    -------------------------------------------------
-;  
-;  - Enter with accumulator = key number = #20 - ASCII value.
-
-.LFDD2  adc     #$39		; 
-        bcc     LFDC8		; 
-
-;    Handle '<=>?>' keys #1C-#1F (ASCII #3C-#3F) subroutine
-;    ------------------------------------------------------
-;  
-;  - Enter with accumulator = key number = #20 - ASCII value.
-
-.LFDD6  eor     #$10		; 
-
-;    Handle '123456789:;' keys #11-#1B (ASCII #31-#3B) subroutine
-;    ------------------------------------------------------------
-;  
-;  - Enter with accumulator = key number = #20 - ASCII value.
-
-.LFDD8  bit     $B001		; 
-        bmi     LFDDF		; 
-        eor     #$10		; 
-
-;    Handle <SPACE> key 0 (ASCII #10) subroutine
-;    -------------------------------------------
-
-	; CONVERT TO ASCII & TEST FOR <CTRL> KEY
-
-.LFDDF  clc			; 
-        adc     #$20		; Convert to ASCII
-.LFDE2  bit     $B001		; Is <CTRL> key pressed ?
-        bvs     LFDE9		; ..no, restore X, Y & flags & return
-        and     #$1F		; ..yes, mask to range 0-#1F
-.LFDE9  jmp     LFE60		; Restore X, Y & flags & return
 
 ;    Handle <LF>, Scrolling if Necessary subroutine
 ;    ----------------------------------------------
@@ -471,54 +414,6 @@ ENDIF
         plp			; Restore flags
         rts			;
 
-;    Wait Until Next CRT Field Flyback subroutine
-;    --------------------------------------------
-;  
-;  Preserves Accumulator, X, Y registers
-
-.LFE66  bit     $B002		; In flyback ?
-        bpl     LFE66		; ..yes, wait until finished
-
-;    Wait Until Next or Current CRT Field Flyback subroutine
-;    -------------------------------------------------------
-
-.LFE6B  bit     $B002		; In flyback ?
-        bmi     LFE6B		; ..no, wait for flyback
-        rts			;
-
-;    Scan Key Matrix subroutine
-;    --------------------------
-;  
-;  - Does not examine the <CTRL>, <SHIFT>, or <REPT> keys.
-;  - Enter with the 4 LSBs of #B000 clear.
-;  - Returns with ASCII value minus #20 in Y register and Carry clear
-;    if successful.
-;  - Destroys A,X,Y registers.
-;  - Returns with Z flag set.
-
-.LFE71  ldy     #$3B		; Set key counter
-        clc			;
-        lda     #$20		; Initialise bit mask to examine bit 5
-.LFE76  ldx     #$0A		; Set row counter
-.LFE78  bit     $B001		; Is the key in this row & column pressed ?
-        beq     LFE85		; ..yes - success
-        inc     $B000		; ..no, point to the next row
-        dey			; Decrement key counter
-        dex			; Decrement row counter
-        bne     LFE78		; ..and test this row in the same column
-        lsr     a		; Tested all the rows - point to next column
-				; If failed, acc shifts to 0, Carry=1 - thus
-				; returns with Carry set if failed
-.LFE85  php			; Save flags - Z set if successful
-        pha			; Save column bit mask
-        lda     $B000		; Get contents of VDG/row counter port
-        and     #$F0		; Leave VDG bits unaltered, but clear row
-				; counter so that <ESC> can be tested easily
-        sta     $B000		; Update VDG/row counter port
-        pla			; Restore column bit mask
-        plp			; Restore flags
-        bne     LFE76		; ..keep testing
-        rts			;
 
 ;    OSRDCH Get Key subroutine
 ;    -------------------------
@@ -555,9 +450,9 @@ ENDIF
 	; GET EXECUTION ADDRESS AND JUMP TO IT
 
         jsr     LFEC5		; Test for control code or otherwise
-.LFEB7  lda     LFEE3, x	; Get LSB execution  Test for control code or otherwiseaddress
+.LFEB7  lda     tablelo, x	; Get LSB execution  Test for control code or otherwiseaddress
         sta     $E2		; ..into w/s
-        lda     #>LFD38		; Get MSB execution  ..into w/saddress
+        lda     tablehi, x	; Get MSB execution  ..into w/saddress
         sta     $E3		; ..into w/s
         tya			; Acc = ASCII value of key - #20
         jmp     ($E2)		; Jump to deal with char or control code
@@ -588,10 +483,11 @@ ENDIF
         EQUB $00, $01, $05, $06, $08, $0E, $0F, $10, $11, $1C, $20, $21, $3B
 
 ;    WRCHAR Control Code Address Lookup Table
-;    Note that this is just the LSB. The MSB is assumed to be $FD
+;    Note that this is just the LSB.
 ;    ----------------------------------------
 
-.LFEE3  EQUB <LFD44		; invert char at cursor position
+.tablelo
+        EQUB <LFD44		; invert char at cursor position
         EQUB <LFD5C		; handle <BS>
 	EQUB <LFD38		; handle <HT>
 	EQUB <LFD62		; handle <LF>
@@ -604,7 +500,7 @@ ENDIF
 	EQUB <LFD50		; handle <DEL>
 
 ;    RDCHAR Control Code Address Lookup Table
-;    Note that this is just the LSB. The MSB is assumed to be $FD
+;    Note that this is just the LSB.
 ;    ----------------------------------------
 
         EQUB <LFDDF		; 
@@ -621,74 +517,41 @@ ENDIF
 	EQUB <LFDC6		; 
 	EQUB <LFDC2		; 
 
-;    Send Contents of Accumulator to VIA subroutine
-;    ----------------------------------------------
-;  
-;  - Waits for the busy line VIA Port A bit 7 to go low, then dumps 7 bit
-;    data to the 7 LSBs of Port A, and then strobes CA2 low for ~20uS.
-;  - Enter with CA2 output set high.
-;  - Preserves A,X,Y registers.
+;    WRCHAR Control Code Address Lookup Table
+;    Note that this is just the MSB.
+;    ----------------------------------------
 
-.LFEFB  pha			; Save a copy of data to be transmitted
-        cmp     #$02		; Is it <STX> ?
-        beq     LFF27		; ..yes, initialise the printer
-        cmp     #$03		; Is it <EXT> ?
-        beq     LFF38		; ..yes, disable the printer
-        cmp     $FE		; Is char allowed to be sent to printer ?
-        beq     LFF36		;  ..no, return
-        lda     $B80C		; Get the VIAs peripheral control register
-        and     #$0E		; Is it set up, ie <STX>ed ?
-        beq     LFF36		; ..no, can't send character - return
-        pla			; Restore character to be sent
+.tablehi	
+        EQUB >LFD44		; invert char at cursor position
+        EQUB >LFD5C		; handle <BS>
+	EQUB >LFD38		; handle <HT>
+	EQUB >LFD62		; handle <LF>
+	EQUB >LFD87		; handle <VT>
+	EQUB >LFD69		; handle <FF>
+	EQUB >LFD40		; handle <CR>
+	EQUB >LFD8D		; handle <SO>
+	EQUB >LFD92		; handle <SI>
+	EQUB >LFD7D		; handle <RS>
+	EQUB >LFD50		; handle <DEL>
 
-	; WAIT FOR PRINTER NOT BUSY
+;    RDCHAR Control Code Address Lookup Table
+;    Note that this is just the MSB.
+;    ----------------------------------------
 
-.LFF10  bit     $B801		; Busy ?
-        bmi     LFF10		; ..yes, wait for printer to be not busy
-        sta     $B801		; Dump character to printer output port A
-        pha			; Save a copy of data that was transmitted
-        lda     $B80C		; Get 6522 VIA peripheral control register
-        and     #$F0		; Don't affect CB1, CB2, Port B conditions
-        ora     #$0C		; ..but set CA2 low - NSTROBE
-        sta     $B80C		; Update the VIA peripheral control register
-        ora     #$02		; Don't affect CB1, CB2 conditions, but set CA2 high
-        bne     LFF33		; Update PCR, restore character and return
-
-	; DO <STX>
-
-.LFF27  lda     #$7F		; 
-        sta     $B803		; Set 7 LSBs of 6522 VIA Port A as the data
-				; outputs and the MSB as the busy input 
-        lda     $B80C		; Get 6522 VIA peripheral control register
-        and     #$F0		; Don't affect CB1, CB2, Port B conditions
-        ora     #$0E		; ..but set CA2 output high
-.LFF33  sta     $B80C		; Update the VIA peripheral control register
-.LFF36  pla			; Restore the data that was transmitted
-        rts			;	 
-
-;    Do <EXT> subroutine
-;    -------------------
-
-.LFF38  lda     $B80C		; Get the VIAs peripheral control register
-        and     #$F0		; Don't affect CB1, CB2, Port B conditions
-        bcs     LFF33		; Update PCR, restore character and return
-
-
-;    Wait up to 4.25 Seconds subroutine
-;    ----------------------------------
-;  
-;  - Waits X 60ths of a second.
-
-.LFB83  jsr     LFE66		; Wait for CRT flyback (one 60th of second)
-        dex			; Decrement 60ths of a second counter
-        bne     LFB83		;
-        rts			;
-
-;    Wait 0.1 second subroutine
-;    --------------------------
-
-.LFB8A  ldx     #$06		; Set counter to 6 60ths of a second
-        bne     LFB83		; ..and count this many CRT flybacks
+        EQUB >LFDDF		; 
+	EQUB >LFDD2		; 
+	EQUB >LFD9A		; handle LOCK
+	EQUB >LFDA2		; handle cursor keys
+	EQUB >LFDE2		; 
+	EQUB >LFDAE		; handle COPY
+	EQUB >LFDC0		; handle DEL
+	EQUB >LFDDF		; 
+	EQUB >LFDD8		; 
+	EQUB >LFDD6		; 
+	EQUB >LFDC8		; 
+	EQUB >LFDC6		; 
+	EQUB >LFDC2		; 
+	
 
 .CLEARMORE
 	sta     SCREEN+$200,Y
