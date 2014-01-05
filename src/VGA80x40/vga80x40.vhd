@@ -31,7 +31,7 @@ entity vga80x40 is
   port (
     reset       : in  std_logic;
     clk25MHz    : in  std_logic;
-    TEXT_A      : out std_logic_vector(11 downto 0); -- text buffer
+    TEXT_A      : out std_logic_vector(12 downto 0); -- text buffer
     TEXT_D      : in  std_logic_vector(07 downto 0);
 	 FONT_A      : out std_logic_vector(11 downto 0); -- font buffer
 	 FONT_D      : in  std_logic_vector(07 downto 0);
@@ -39,6 +39,7 @@ entity vga80x40 is
 	 ocrx        : in  std_logic_vector(07 downto 0); -- OUTPUT regs
     ocry        : in  std_logic_vector(07 downto 0);
     octl        : in  std_logic_vector(07 downto 0);
+    octl2       : in  std_logic_vector(07 downto 0);
     --
     R           : out std_logic;
     G           : out std_logic;
@@ -71,7 +72,17 @@ architecture rtl of vga80x40 is
   signal losr_ld : std_logic;
   signal losr_do : std_logic;
   signal y       : std_logic;  -- character luminance pixel value (0 or 1)
+  signal ys      : std_logic;  -- character luminance pixel value (0 or 1) after semigraphic attribute
+  signal yu      : std_logic;  -- character luminance pixel value (0 or 1) after underline attribute
+  signal ya      : std_logic;  -- character luminance pixel value (0 or 1) after all attrributes
 
+  -- Data byte for the current character (before the font mapping) used for semi graphics
+  signal data   : std_logic_vector(7 downto 0);
+
+  -- Colour attributes byte for the current character
+  signal attrtmp   : std_logic_vector(7 downto 0);
+  signal attr   : std_logic_vector(7 downto 0);
+  
   -- control io register
   signal ctl       : std_logic_vector(7 downto 0);
   signal vga_en    : std_logic;
@@ -81,6 +92,10 @@ architecture rtl of vga80x40 is
   signal ctl_r     : std_logic;
   signal ctl_g     : std_logic;
   signal ctl_b     : std_logic;
+  signal ctl_r_bg  : std_logic;
+  signal ctl_g_bg  : std_logic;
+  signal ctl_b_bg  : std_logic;
+  signal ctl_attr  : std_logic;
 
   component ctrm
     generic (
@@ -177,9 +192,14 @@ begin
   cur_blink <= octl(5); 
   cur_en    <= octl(6); 
   vga_en    <= octl(7); 
+  ctl_attr  <= octl(3);
   ctl_r     <= octl(2);
   ctl_g     <= octl(1);
   ctl_b     <= octl(0);
+
+  ctl_r_bg  <= octl2(2);
+  ctl_g_bg  <= octl2(1);
+  ctl_b_bg  <= octl2(0);
 
 	-- counters, hctr, vctr, srcx, srcy, chrx, chry
 	-- TODO: OPTIMIZE THIS
@@ -199,13 +219,16 @@ begin
     signal scry_rs : std_logic;
 
     signal hctr_639 : std_logic;
+    signal hctr_647 : std_logic;
     signal vctr_479 : std_logic;
     signal chrx_007 : std_logic;
     signal chry_011 : std_logic;
     signal scrx_079 : std_logic;
+    
+    signal read_attr : std_logic;
 
     -- RAM read, ROM read
-    signal ram_tmp : integer range 3200 downto 0;  --12 bits
+    signal ram_tmp : integer range 6400 downto 0;  --13 bits
     signal rom_tmp : integer range 3070 downto 0;
 
   begin
@@ -225,6 +248,7 @@ begin
     U_SCRX: ctrm generic map (M => 080) port map (reset, clk25MHz, scrx_ce, scrx_rs, scrx);
     U_SCRY: ctrm generic map (M => 040) port map (reset, clk25MHz, scry_ce, scry_rs, scry);
 
+    hctr_647 <= '1' when hctr = 647 else '0';
     hctr_639 <= '1' when hctr = 639 else '0';
     vctr_479 <= '1' when vctr = 479 else '0';
     chrx_007 <= '1' when chrx = 007 else '0';
@@ -232,28 +256,43 @@ begin
     scrx_079 <= '1' when scrx = 079 else '0';
 
     chrx_rs <= chrx_007 or hctr_639;
-    chry_rs <= chry_011 or vctr_479;
-    scrx_rs <= hctr_639;
-    scry_rs <= vctr_479;
-
     chrx_ce <= '1' and blank;
-    scrx_ce <= chrx_007;
-    chry_ce <= hctr_639 and blank;
-    scry_ce <= chry_011 and hctr_639;
 
+    chry_rs <= chry_011 or vctr_479;
+    chry_ce <= hctr_647 and blank;
+
+    scrx_ce <= chrx_007;
+    scrx_rs <= hctr_639;
+
+    scry_ce <= chry_011 and hctr_639;
+    scry_rs <= vctr_479;
 
 -- Proboscide99 31/08/08
 --    ram_tmp <= scry * 80 + scrx + 1 when ((scrx_079 = '0')) else
 --               scry * 80 when ((chry_011 = '0') and (scrx_079 = '1')) else
 --               0         when ((chry_011 = '1') and (scrx_079 = '1'));
-    ram_tmp <= scry * 80 + scrx;
+    read_attr <= '1' when chrx = 000 or chrx = 001 or chrx = 002 or chrx = 003 else '0';
+    ram_tmp <= scry * 80 + scrx + 3200 when read_attr = '1' else scry * 80 + scrx;
 
-    TEXT_A <= std_logic_vector(TO_UNSIGNED(ram_tmp, 12));
+    TEXT_A <= std_logic_vector(TO_UNSIGNED(ram_tmp, 13));
 
     rom_tmp <= TO_INTEGER(unsigned(TEXT_D)) * 16 + chry;
     FONT_A <= std_logic_vector(TO_UNSIGNED(rom_tmp, 12));
 
   end block;
+  
+  process (clk25MHz)
+    begin
+        if rising_edge(clk25MHz) then
+            if (chrx = 003) then
+                attrtmp <= TEXT_D;
+            end if;
+            if (chrx = 007) then
+                attr <= attrtmp;
+                data <= TEXT_D;
+            end if;
+        end if;
+   end process;
 -------------------------------------------------------------------------------
 -------------------------------------------------------------------------------
 -------------------------------------------------------------------------------
@@ -264,11 +303,28 @@ begin
   losr_ce <= blank;
   losr_ld <= '1' when (chrx = 007) else '0';
 
+  -- Apply the underline attriute to the luminance
+  yu <= not y when ((attr(3) = '1') and (chry = 0010)) else y;
+
+  -- Generate the semigraphic pixel data
+  ys <= '1' when
+     (data(0) = '1' and (chrx >= 004) and (chry >= 008)) or
+     (data(1) = '1' and (chrx < 004) and (chry >= 008)) or
+     (data(2) = '1' and (chrx >= 004) and (chry >= 004) and (chry < 008)) or
+     (data(3) = '1' and (chrx < 004) and (chry >= 004) and (chry < 008)) or
+     (data(4) = '1' and (chrx >= 004) and (chry < 004)) or
+     (data(5) = '1' and (chrx < 004) and (chry < 004)) else '0';
+    
+  ya <= ys when (attr(7) = '1') else yu;
+
   -- video out, vga_en control signal enable/disable vga signal
-  R_int <= (ctl_r and y) and blank;
-  G_int <= (ctl_g and y) and blank;
-  B_int <= (ctl_b and y) and blank;
-  
+  R_int <= (((not ctl_attr) and ((y and ctl_r) or ((not y) and ctl_r_bg))) or
+                (ctl_attr and ((ya and attr(2)) or ((not ya) and attr(6))))) and blank;
+  G_int <= (((not ctl_attr) and ((y and ctl_g) or ((not y) and ctl_g_bg))) or
+                (ctl_attr and ((ya and attr(1)) or ((not ya) and attr(5))))) and blank;
+  B_int <= (((not ctl_attr) and ((y and ctl_b) or ((not y) and ctl_b_bg))) or
+                (ctl_attr and ((ya and attr(0)) or ((not ya) and attr(4))))) and blank;
+    
   hsync <= hsync_int and vga_en;
   vsync <= vsync_int and vga_en;  
   

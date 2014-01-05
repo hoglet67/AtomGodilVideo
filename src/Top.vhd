@@ -169,6 +169,7 @@ architecture BEHAVIORAL of Top is
     signal ocrx : std_logic_vector (7 downto 0);
     signal ocry : std_logic_vector (7 downto 0);
     signal octl : std_logic_vector (7 downto 0);
+    signal octl2 : std_logic_vector (7 downto 0);
     signal char_we : std_logic;
     
     signal mc6847_an_s : std_logic;
@@ -197,7 +198,7 @@ architecture BEHAVIORAL of Top is
     signal vga80_invert  : std_logic;
     signal vga80_char_a  : std_logic_vector (10 downto 0);
     signal vga80_char_d  : std_logic_vector (7 downto 0);
-    signal vga80_addrb   : std_logic_vector (11 downto 0);
+    signal vga80_addrb   : std_logic_vector (12 downto 0);
     
     component DCM0
         port(
@@ -235,7 +236,8 @@ architecture BEHAVIORAL of Top is
             ocrx : IN std_logic_vector(7 downto 0);
             ocry : IN std_logic_vector(7 downto 0);
             octl : IN std_logic_vector(7 downto 0);          
-            TEXT_A : OUT std_logic_vector(11 downto 0);
+            octl2 : IN std_logic_vector(7 downto 0);          
+            TEXT_A : OUT std_logic_vector(12 downto 0);
             FONT_A : OUT std_logic_vector(11 downto 0);
             R : OUT std_logic;
             G : OUT std_logic;
@@ -389,6 +391,7 @@ begin
 		ocrx => ocrx,
 		ocry => ocry,
 		octl => octl,
+		octl2 => octl2,
 		R => vga80_R,
 		G => vga80_G,
 		B => vga80_B,
@@ -478,7 +481,10 @@ begin
                 char_addr <= (others => '0');
                 ocrx <= (others => '0');
                 ocry <= (others => '0');
+                -- Default to Green Foreground
                 octl <= "10000010";
+                -- Default to Black Background
+                octl2 <= "00000000";
             elsif (reg_cs = '1' and reg_we = '1') then
                 case reg_addr is
                 -- extensions register
@@ -493,6 +499,8 @@ begin
                   ocry <= reg_di;
                 when "00100" =>
                   octl <= reg_di;
+                when "00101" =>
+                  octl2 <= reg_di;
                 when others =>
                 end case;
             end if;
@@ -668,7 +676,7 @@ begin
     final_vsync  <= vga_vsync     when vga80x40mode = '0' else vga80_vsync;
     final_hsync  <= vga_hsync     when vga80x40mode = '0' else vga80_hsync;
     final_char_a <= mc6847_char_a when vga80x40mode = '0' else vga80_char_a;
-    addrb        <= mc6847_addrb  when vga80x40mode = '0' else '0' & vga80_addrb;
+    addrb        <= mc6847_addrb  when vga80x40mode = '0' else vga80_addrb;
     -- 1 Bit RGB Video to PL4 Connectors
     OA  <= final_red    when nPL4 = '0' else '0';
     CHB <= final_green1 when nPL4 = '0' else '0';
