@@ -64,8 +64,11 @@ architecture rtl of vga80x40 is
   signal vctr  : integer range 524 downto 0;
   -- character/pixel position on the screen
   signal scry  : integer range 039 downto 0;  -- chr row   < 40 (6 bits)
+  signal scry_r: integer range 039 downto 0;  -- chr row   < 40 (6 bits)
   signal scrx  : integer range 079 downto 0;  -- chr col   < 80 (7 bits)
+  signal scrx_r: integer range 079 downto 0;  -- chr col   < 80 (7 bits)
   signal chry  : integer range 011 downto 0;  -- chr high  < 12 (4 bits)
+  signal chry_r: integer range 011 downto 0;  -- chr high  < 12 (4 bits)
   signal chrx  : integer range 007 downto 0;  -- chr width < 08 (3 bits)
   
   signal losr_ce : std_logic;
@@ -219,7 +222,6 @@ begin
     signal scry_rs : std_logic;
 
     signal hctr_639 : std_logic;
-    signal hctr_647 : std_logic;
     signal vctr_479 : std_logic;
     signal chrx_007 : std_logic;
     signal chry_011 : std_logic;
@@ -248,7 +250,6 @@ begin
     U_SCRX: ctrm generic map (M => 080) port map (reset, clk25MHz, scrx_ce, scrx_rs, scrx);
     U_SCRY: ctrm generic map (M => 040) port map (reset, clk25MHz, scry_ce, scry_rs, scry);
 
-    hctr_647 <= '1' when hctr = 647 else '0';
     hctr_639 <= '1' when hctr = 639 else '0';
     vctr_479 <= '1' when vctr = 479 else '0';
     chrx_007 <= '1' when chrx = 007 else '0';
@@ -259,7 +260,7 @@ begin
     chrx_ce <= '1' and blank;
 
     chry_rs <= chry_011 or vctr_479;
-    chry_ce <= hctr_647 and blank;
+    chry_ce <= hctr_639 and blank;
 
     scrx_ce <= chrx_007;
     scrx_rs <= hctr_639;
@@ -291,6 +292,11 @@ begin
                 attr <= attrtmp;
                 data <= TEXT_D;
             end if;
+            if (losr_ld = '1') then
+                scrx_r <= scrx;
+                scry_r <= scry;
+                chry_r <= chry;
+            end if;
         end if;
    end process;
 -------------------------------------------------------------------------------
@@ -308,12 +314,12 @@ begin
 
   -- Generate the semigraphic pixel data
   ys <= '1' when
-     (data(0) = '1' and (chrx >= 004) and (chry >= 008)) or
-     (data(1) = '1' and (chrx < 004) and (chry >= 008)) or
-     (data(2) = '1' and (chrx >= 004) and (chry >= 004) and (chry < 008)) or
-     (data(3) = '1' and (chrx < 004) and (chry >= 004) and (chry < 008)) or
-     (data(4) = '1' and (chrx >= 004) and (chry < 004)) or
-     (data(5) = '1' and (chrx < 004) and (chry < 004)) else '0';
+     (data(0) = '1' and (chrx >= 004) and (chry_r >= 008)) or
+     (data(1) = '1' and (chrx < 004) and (chry_r >= 008)) or
+     (data(2) = '1' and (chrx >= 004) and (chry_r >= 004) and (chry_r < 008)) or
+     (data(3) = '1' and (chrx < 004) and (chry_r >= 004) and (chry_r < 008)) or
+     (data(4) = '1' and (chrx >= 004) and (chry_r < 004)) or
+     (data(5) = '1' and (chrx < 004) and (chry_r < 004)) else '0';
     
   ya <= ys when (attr(7) = '1') else yu;
 
@@ -354,10 +360,10 @@ begin
     cry <= TO_INTEGER(unsigned(ocry(5 downto 0)));
 
     --
-    curpos <= '1' when (scry = cry) and (scrx = crx) else '0';
-    small  <= '1' when (chry > 8)                    else '0';
+    curpos <= '1' when (scry_r = cry) and (scrx_r = crx) else '0';
+    small  <= '1' when (chry_r > 8)                      else '0';
     curen2 <= (slowclk or (not cur_blink)) and cur_en;
-    yint   <= '1' when cur_mode = '0'                else small;
+    yint   <= '1' when cur_mode = '0'                    else small;
     y      <= (yint and curpos and curen2) xor losr_do;
     
   end block;
