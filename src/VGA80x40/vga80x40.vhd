@@ -310,7 +310,7 @@ begin
   losr_ld <= '1' when (chrx = 007) else '0';
 
   -- Apply the underline attriute to the luminance
-  yu <= not y when ((attr(3) = '1') and (chry = 0010)) else y;
+  yu <= not y when ((attr(3) = '1') and (chry_r = 0010)) else y;
 
   -- Generate the semigraphic pixel data
   ys <= '1' when
