@@ -1,0 +1,47 @@
+Name     IC23        ;
+PartNo   00          ;
+Date     26/12/2013  ;
+Revision 01          ;
+Designer David Banks ;
+Company  NA          ;
+Assembly None        ;
+Location             ;
+Device   g16v8       ;
+
+/* *************** INPUT PINS *********************/
+PIN 1    = A12;
+PIN 2    = A13;
+PIN 3    = A14;
+PIN 6    = A15;
+PIN 9    = IC49PIN7;
+PIN 11   = A8;
+PIN 12   = A9;
+
+/* *************** OUTPUT PINS *********************/
+PIN 19   = NVIDSEL;
+PIN 18   = NSIDSEL;
+PIN 17   = NAXXX;
+PIN 16   = NBXXX;
+PIN 15   = NROMSEL;
+PIN 14   = NDXXX;
+PIN 13   = NEXXX;
+
+/* *************** EQUATIONS ***********************/
+
+N8XXX = !(A15 & !A14 & !A13 & !A12);
+N9XXX = !(A15 & !A14 & !A13 &  A12);
+NAXXX = !(A15 & !A14 &  A13 & !A12);
+NBXXX = !(A15 & !A14 &  A13 &  A12);
+NCXXX = !(A15 &  A14 & !A13 & !A12);
+NDXXX = !(A15 &  A14 & !A13 &  A12);
+NEXXX = !(A15 &  A14 &  A13 & !A12);
+NFXXX = !(A15 &  A14 &  A13 &  A12);
+
+/* Low when address matches 8xxx Or 9xxx */
+NVIDSEL = N8XXX & N9XXX;
+
+/* Low when address matches BDxx */
+NSIDSEL = !(!IC49PIN7 & !A9 & A8);
+
+/* Low when address matches Cxxx Or Fxxx */
+NROMSEL = NCXXX & NFXXX;
