@@ -3,4 +3,11 @@ AtomGodilVideo
 
 New Video Adapter for Acorn Atom implemented in a GODIL FPGA
 
-See http://stardot.org.uk/forums/viewtopic.php?f=3&t=5994&start=120#p73695
+See the Wiki for the latest documentation:
+https://github.com/hoglet67/AtomGodilVideo/wiki
+
+See the stardot.org.uk thread for support:
+http://www.stardot.org.uk/forums/viewtopic.php?f=44&t=7320
+
+-- Dave
+
