@@ -121,6 +121,7 @@ architecture BEHAVIORAL of Top is
     signal DA2  : std_logic_vector (12 downto 0);
     signal DD1  : std_logic_vector (7 downto 0);
     signal DD2  : std_logic_vector (7 downto 0);
+    signal DD3  : std_logic_vector (7 downto 0);
 
     -- VGA colour signals out of mc6847, only top 2 bits are used
     signal vga_red   : std_logic_vector (7 downto 0);
@@ -464,6 +465,7 @@ begin
             nWRMS1 <= nWR or nMS;
             nWR2 <= nWR1;
             nWR1 <= nWR;
+            DD3  <= DD2;
             DD2  <= DD1;
             DD1  <= DD;
             DA2  <= DA1;
@@ -626,7 +628,7 @@ begin
     -- Signals driving the VRAM
     -- Write just before the rising edge of nWR
     wr    <= '1' when (nWRMS1 = '1' and nWRMS2 = '0') else '0';
-    dina  <= DD2;
+    dina  <= DD3;
     addra <= DA2;
     
     -- Signals driving the internal registers
@@ -640,7 +642,7 @@ begin
                        (nSIDD = '0' and nWR1 = '1' and nWR2 = '0')
                   else '0';
 
-    reg_di <= DD2;
+    reg_di <= DD3;
     reg_addr <= DA2(4 downto 0);
 
     -- Signals driving the SID
@@ -655,7 +657,7 @@ begin
                   else '0';
 
     char_we <= '1' when reg_cs = '1' and reg_we = '1' and char_addr(7) = '1' and reg_addr(4) = '1' else '0';
-    sid_di <= DD2;
+    sid_di <= DD3;
     sid_addr <= DA2(4 downto 0);
     
     -- Tri-state data back to the Atom
