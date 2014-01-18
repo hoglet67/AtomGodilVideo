@@ -83,7 +83,11 @@ entity Top is
         nSIDD : in std_logic;
         
         -- Active low version of the SID Select Signal for disabling the external bus buffers
-        nSIDSEL : out std_logic
+        nSIDSEL : out std_logic;
+        
+        -- PS/2 Mouse
+        PS2_CLK : inout std_logic;
+        PS2_DATA : inout std_logic
 
         );
 end Top;
@@ -178,10 +182,15 @@ architecture BEHAVIORAL of Top is
     signal mc6847_inv : std_logic;
     signal mc6847_css : std_logic;
     signal mc6847_d : std_logic_vector (7 downto 0);
+    signal mc6847_d_with_pointer : std_logic_vector (7 downto 0);
     signal mc6847_char_a : std_logic_vector (10 downto 0);
     signal mc6847_addrb : std_logic_vector (12 downto 0);
     signal char_d_o : std_logic_vector (7 downto 0);
-    
+
+    signal pointerOn : std_logic;
+    signal pointerX : std_logic_vector (7 downto 0);
+    signal pointerY : std_logic_vector (7 downto 0);
+        
     signal vga80x40mode  : std_logic;
     signal final_red     : std_logic;
     signal final_green1  : std_logic;
@@ -295,7 +304,7 @@ architecture BEHAVIORAL of Top is
             doutb : out std_logic_vector(7 downto 0)
             );
     end component;
-    
+
     component sid6581
         port(
             clk_1MHz : in std_logic;
@@ -311,6 +320,35 @@ architecture BEHAVIORAL of Top is
             do : out std_logic_vector(7 downto 0);
             audio_out : out std_logic;
             audio_data : out std_logic_vector(17 downto 0)
+            );
+    end component;
+    
+    component MouseRefComp
+        port(
+            CLK : IN std_logic;
+            RESOLUTION : IN std_logic;
+            RST : IN std_logic;
+            SWITCH : IN std_logic;    
+            PS2_CLK : INOUT std_logic;
+            PS2_DATA : INOUT std_logic;      
+            LEFT : OUT std_logic;
+            MIDDLE : OUT std_logic;
+            NEW_EVENT : OUT std_logic;
+            RIGHT : OUT std_logic;
+            XPOS : OUT std_logic_vector(9 downto 0);
+            YPOS : OUT std_logic_vector(9 downto 0);
+            ZPOS : OUT std_logic_vector(3 downto 0)
+            );
+    end component;
+
+    component Pointer is
+        port (
+            PO   : in  std_logic;
+            X    : in  std_logic_vector (7 downto 0);
+            Y    : in  std_logic_vector (7 downto 0);
+            ADDR : in  std_logic_vector (12 downto 0);
+            DIN  : in  std_logic_vector (7 downto 0);
+            DOUT : out std_logic_vector (7 downto 0)
             );
     end component;
 
@@ -356,7 +394,7 @@ begin
             reset          => reset,
             da0            => open,
             videoaddr      => mc6847_addrb,
-            dd             => mc6847_d,
+            dd             => mc6847_d_with_pointer,
             hs_n           => open,
             fs_n           => nFS,
             an_g           => ag_masked,
@@ -380,7 +418,7 @@ begin
             char_a         => mc6847_char_a,
             char_d_o       => char_d_o
             );
-
+    
 	Inst_vga80x40: vga80x40 PORT MAP(
 		reset => reset,
 		clk25MHz => clock25,
@@ -451,7 +489,34 @@ begin
             audio_out => sid_audio,
             audio_data => open 
         );
+    pointerOn <= extensions(6);
+
+    Inst_Pointer: Pointer PORT MAP (
+        PO => pointerOn,
+        X  => pointerX,
+        Y  => pointerY,
+        ADDR => mc6847_addrb, 
+        DIN  => mc6847_d, 
+        DOUT => mc6847_d_with_pointer
+    );
     
+	Inst_MouseRefComp: MouseRefComp PORT MAP(
+		CLK => clock49,
+		RESOLUTION => '1', -- select 256x192 resolution
+		RST => not nRST,
+		SWITCH => '0',
+		LEFT => open,
+		MIDDLE => open,
+		NEW_EVENT => open,
+		RIGHT => open,
+		XPOS(7 downto 0) => pointerX,
+		XPOS(9 downto 8) => open,
+		YPOS(7 downto 0) => pointerY,
+		YPOS(9 downto 8) => open,
+		ZPOS => open,
+		PS2_CLK => PS2_CLK,
+		PS2_DATA => PS2_DATA
+	);    
 
     -- Pipelined version of address/data/write signals
     process (clock32)
