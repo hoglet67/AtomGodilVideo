@@ -176,6 +176,7 @@ architecture BEHAVIORAL of Top is
     signal octl : std_logic_vector (7 downto 0);
     signal octl2 : std_logic_vector (7 downto 0);
     signal char_we : std_logic;
+    signal char_reg : std_logic_vector (7 downto 0);
     
     signal mc6847_an_s : std_logic;
     signal mc6847_intn_ext : std_logic;
@@ -187,10 +188,15 @@ architecture BEHAVIORAL of Top is
     signal mc6847_addrb : std_logic_vector (12 downto 0);
     signal char_d_o : std_logic_vector (7 downto 0);
 
-    signal pointerOn : std_logic;
-    signal pointerX : std_logic_vector (7 downto 0);
-    signal pointerY : std_logic_vector (7 downto 0);
-        
+    signal pointer_nr     : std_logic_vector (7 downto 0);
+    signal pointer_nr_rd  : std_logic_vector (7 downto 0);
+    signal pointer_x      : std_logic_vector (7 downto 0);
+    signal pointer_y      : std_logic_vector (7 downto 0);
+    signal pointer_left   : std_logic;
+    signal pointer_middle : std_logic;
+    signal pointer_right  : std_logic;
+
+
     signal vga80x40mode  : std_logic;
     signal final_red     : std_logic;
     signal final_green1  : std_logic;
@@ -344,6 +350,7 @@ architecture BEHAVIORAL of Top is
     component Pointer is
         port (
             PO   : in  std_logic;
+            PS   : in  std_logic_vector (4 downto 0);
             X    : in  std_logic_vector (7 downto 0);
             Y    : in  std_logic_vector (7 downto 0);
             ADDR : in  std_logic_vector (12 downto 0);
@@ -447,7 +454,7 @@ begin
             addra(10 downto 4) => char_addr(6 downto 0),
             addra(3 downto 0) => reg_addr(3 downto 0),
             dina  => reg_di,
-            douta => open,
+            douta => char_reg,
             clkb  => clock25,
             web   => '0',
             addrb => final_char_a,
@@ -489,33 +496,33 @@ begin
             audio_out => sid_audio,
             audio_data => open 
         );
-    pointerOn <= extensions(6);
 
     Inst_Pointer: Pointer PORT MAP (
-        PO => pointerOn,
-        X  => pointerX,
-        Y  => pointerY,
+        PO => pointer_nr(7),
+        PS => pointer_nr(4 downto 0),
+        X  => pointer_x,
+        Y  => pointer_y,
         ADDR => mc6847_addrb, 
         DIN  => mc6847_d, 
         DOUT => mc6847_d_with_pointer
     );
     
-	Inst_MouseRefComp: MouseRefComp PORT MAP(
-		CLK => clock49,
-		RESOLUTION => '1', -- select 256x192 resolution
-		RST => not nRST,
-		SWITCH => '0',
-		LEFT => open,
-		MIDDLE => open,
-		NEW_EVENT => open,
-		RIGHT => open,
-		XPOS(7 downto 0) => pointerX,
-		XPOS(9 downto 8) => open,
-		YPOS(7 downto 0) => pointerY,
-		YPOS(9 downto 8) => open,
-		ZPOS => open,
-		PS2_CLK => PS2_CLK,
-		PS2_DATA => PS2_DATA
+    Inst_MouseRefComp: MouseRefComp PORT MAP(
+        CLK => clock49,
+        RESOLUTION => '1', -- select 256x192 resolution
+        RST => not nRST,
+        SWITCH => '0',
+        LEFT => pointer_left,
+        MIDDLE => pointer_middle,
+        NEW_EVENT => open,
+        RIGHT => pointer_right,
+        XPOS(7 downto 0) => pointer_x,
+        XPOS(9 downto 8) => open,
+        YPOS(7 downto 0) => pointer_y,
+        YPOS(9 downto 8) => open,
+        ZPOS => open,
+        PS2_CLK => PS2_CLK,
+    	PS2_DATA => PS2_DATA
 	);    
 
     -- Pipelined version of address/data/write signals
@@ -552,6 +559,7 @@ begin
                 octl <= "10000010";
                 -- Default to Black Background
                 octl2 <= "00000000";
+                pointer_nr <= (others => '0');
             elsif (reg_cs = '1' and reg_we = '1') then
                 case reg_addr is
                 -- extensions register
@@ -568,7 +576,11 @@ begin
                   octl <= reg_di;
                 when "00101" =>
                   octl2 <= reg_di;
+                when "01010" =>
+                  pointer_nr <= reg_di;
+                  
                 when others =>
+                  
                 end case;
             end if;
         end if;
@@ -707,9 +719,29 @@ begin
                        (nSIDD = '0' and nWR1 = '1' and nWR2 = '0')
                   else '0';
 
+    pointer_nr_rd <= pointer_nr(7) & "1111" & not pointer_middle & not pointer_right & not pointer_left;
+    
     reg_di <= DD3;
     reg_addr <= DA2(4 downto 0);
-
+    reg_do <= extensions    when reg_addr = "00000" else
+              char_addr     when reg_addr = "00001" else
+              ocrx          when reg_addr = "00010" else
+              ocry          when reg_addr = "00011" else
+              octl          when reg_addr = "00100" else
+              octl2         when reg_addr = "00101" else
+              "10101010"    when reg_addr = "00110" else
+              "10101010"    when reg_addr = "00111" else
+              pointer_x     when reg_addr = "01000" else
+              pointer_y     when reg_addr = "01001" else
+              pointer_nr_rd when reg_addr = "01010" else
+              "10101010"    when reg_addr = "01011" else
+              "10101010"    when reg_addr = "01100" else
+              "10101010"    when reg_addr = "01101" else
+              "10101010"    when reg_addr = "01110" else
+              "10101010"    when reg_addr = "01111" else
+              char_reg;
+    
+    
     -- Signals driving the SID
     -- When nSIDD=0 the SID is mapped to BDC0-BDCF
     -- When nSIDD=1 the SID is mapped to 9EF0-9FFF
@@ -726,7 +758,9 @@ begin
     sid_addr <= DA2(4 downto 0);
     
     -- Tri-state data back to the Atom
-    dout <= sid_do when sid_cs = '1' else douta;
+    dout <= sid_do when sid_cs = '1' else
+            reg_do when reg_cs = '1' else
+            douta;
     DD    <= dout when (nMS = '0' and nWR = '1') else (others => 'Z');
     
     -- Output the SID Select Signal so it can be used to disable the bus buffers
@@ -782,7 +816,7 @@ begin
         end if;
     end process;
     
-   process (clock25)
+    process (clock25)
     begin
         if rising_edge(clock25) then
             clock25en <= not clock25en;

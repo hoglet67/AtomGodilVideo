@@ -5,6 +5,7 @@ use ieee.std_logic_unsigned.all;
 
   entity Pointer is
   port ( PO   : in  std_logic;
+         PS   : in  std_logic_vector (4 downto 0);
          X    : in  std_logic_vector (7 downto 0);
          Y    : in  std_logic_vector (7 downto 0);
          ADDR : in  std_logic_vector (12 downto 0);
