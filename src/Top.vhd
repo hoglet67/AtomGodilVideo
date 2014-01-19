@@ -349,6 +349,7 @@ architecture BEHAVIORAL of Top is
 
     component Pointer is
         port (
+            CLK  : in  std_logic;
             PO   : in  std_logic;
             PS   : in  std_logic_vector (4 downto 0);
             X    : in  std_logic_vector (7 downto 0);
@@ -498,6 +499,7 @@ begin
         );
 
     Inst_Pointer: Pointer PORT MAP (
+        CLK => clock25,
         PO => pointer_nr(7),
         PS => pointer_nr(4 downto 0),
         X  => pointer_x,
