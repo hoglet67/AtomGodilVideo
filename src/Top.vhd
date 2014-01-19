@@ -192,6 +192,7 @@ architecture BEHAVIORAL of Top is
     signal pointer_nr_rd  : std_logic_vector (7 downto 0);
     signal pointer_x      : std_logic_vector (7 downto 0);
     signal pointer_y      : std_logic_vector (7 downto 0);
+    signal pointer_y_inv  : std_logic_vector (7 downto 0);
     signal pointer_left   : std_logic;
     signal pointer_middle : std_logic;
     signal pointer_right  : std_logic;
@@ -500,7 +501,7 @@ begin
 
     Inst_Pointer: Pointer PORT MAP (
         CLK => clock25,
-        PO => pointer_nr(7),
+        PO => not pointer_nr(7),
         PS => pointer_nr(4 downto 0),
         X  => pointer_x,
         Y  => pointer_y,
@@ -561,7 +562,7 @@ begin
                 octl <= "10000010";
                 -- Default to Black Background
                 octl2 <= "00000000";
-                pointer_nr <= (others => '0');
+                pointer_nr <= "10000000";
             elsif (reg_cs = '1' and reg_we = '1') then
                 case reg_addr is
                 -- extensions register
@@ -725,6 +726,8 @@ begin
     
     reg_di <= DD3;
     reg_addr <= DA2(4 downto 0);
+    pointer_y_inv <= pointer_y xor "11111111";
+    
     reg_do <= extensions    when reg_addr = "00000" else
               char_addr     when reg_addr = "00001" else
               ocrx          when reg_addr = "00010" else
@@ -734,7 +737,7 @@ begin
               "10101010"    when reg_addr = "00110" else
               "10101010"    when reg_addr = "00111" else
               pointer_x     when reg_addr = "01000" else
-              pointer_y     when reg_addr = "01001" else
+              pointer_y_inv when reg_addr = "01001" else
               pointer_nr_rd when reg_addr = "01010" else
               "10101010"    when reg_addr = "01011" else
               "10101010"    when reg_addr = "01100" else
