@@ -186,6 +186,7 @@ architecture BEHAVIORAL of Top is
     signal mc6847_d_with_pointer : std_logic_vector (7 downto 0);
     signal mc6847_char_a : std_logic_vector (10 downto 0);
     signal mc6847_addrb : std_logic_vector (12 downto 0);
+    signal mc6847_addrb_hw : std_logic_vector (12 downto 0);
     signal char_d_o : std_logic_vector (7 downto 0);
 
     signal pointer_nr     : std_logic_vector (7 downto 0);
@@ -197,6 +198,13 @@ architecture BEHAVIORAL of Top is
     signal pointer_middle : std_logic;
     signal pointer_right  : std_logic;
 
+    signal hwscrollmode  : std_logic;
+    
+    signal scroll_h       : std_logic_vector (7 downto 0);
+    signal scroll_v       : std_logic_vector (7 downto 0);
+    
+    signal width32        : std_logic;
+    signal lines          : std_logic_vector (7 downto 0);
 
     signal vga80x40mode  : std_logic;
     signal final_red     : std_logic;
@@ -563,6 +571,8 @@ begin
                 -- Default to Black Background
                 octl2 <= "00000000";
                 pointer_nr <= "10000000";
+                scroll_h <= (others => '0');
+                scroll_v <= (others => '0');
             elsif (reg_cs = '1' and reg_we = '1') then
                 case reg_addr is
                 -- extensions register
@@ -579,6 +589,10 @@ begin
                   octl <= reg_di;
                 when "00101" =>
                   octl2 <= reg_di;
+                when "00110" =>
+                  scroll_h <= reg_di;
+                when "00111" =>
+                  scroll_v <= reg_di;
                 when "01010" =>
                   pointer_nr <= reg_di;
                   
@@ -734,8 +748,8 @@ begin
               ocry          when reg_addr = "00011" else
               octl          when reg_addr = "00100" else
               octl2         when reg_addr = "00101" else
-              "10101010"    when reg_addr = "00110" else
-              "10101010"    when reg_addr = "00111" else
+              scroll_h      when reg_addr = "00110" else
+              scroll_v      when reg_addr = "00111" else
               pointer_x     when reg_addr = "01000" else
               pointer_y_inv when reg_addr = "01001" else
               pointer_nr_rd when reg_addr = "01010" else
@@ -775,14 +789,58 @@ begin
     -- VGA Multiplexing between two controllers
     
     vga80x40mode <= extensions(7);
-    final_red    <= vga_red(7)    when vga80x40mode = '0' else vga80_R;
-    final_green1 <= vga_green(7)  when vga80x40mode = '0' else vga80_G;
-    final_green0 <= vga_green(6)  when vga80x40mode = '0' else vga80_G;
-    final_blue   <= vga_blue(7)   when vga80x40mode = '0' else vga80_B;
-    final_vsync  <= vga_vsync     when vga80x40mode = '0' else vga80_vsync;
-    final_hsync  <= vga_hsync     when vga80x40mode = '0' else vga80_hsync;
-    final_char_a <= mc6847_char_a when vga80x40mode = '0' else vga80_char_a;
-    addrb        <= mc6847_addrb  when vga80x40mode = '0' else vga80_addrb;
+    hwscrollmode <= extensions(6);
+    final_red    <= vga_red(7)      when vga80x40mode = '0' else vga80_R;
+    final_green1 <= vga_green(7)    when vga80x40mode = '0' else vga80_G;
+    final_green0 <= vga_green(6)    when vga80x40mode = '0' else vga80_G;
+    final_blue   <= vga_blue(7)     when vga80x40mode = '0' else vga80_B;
+    final_vsync  <= vga_vsync       when vga80x40mode = '0' else vga80_vsync;
+    final_hsync  <= vga_hsync       when vga80x40mode = '0' else vga80_hsync;
+    final_char_a <= mc6847_char_a   when vga80x40mode = '0' else vga80_char_a;
+    addrb        <= mc6847_addrb    when vga80x40mode = '0' and hwscrollmode = '0' else
+                    mc6847_addrb_hw when vga80x40mode = '0' and hwscrollmode = '1' else
+                    vga80_addrb;
+
+    -- 32 bytes wide in Modes 0, 2a, 3a, 4a, 4
+    -- 16 bytes wide in Modes 1a, 1, 2, 3
+    width32 <= '1' when ag_masked = '0' or 
+                gm_masked = "010" or gm_masked = "100" or 
+                gm_masked = "110" or gm_masked = "111" else '0';
+    
+    
+    lines <= "00010000" when ag_masked = '0' else
+             "01000000" when gm_masked = "000" or gm_masked = "001" or gm_masked = "010" else
+             "01100000" when gm_masked = "011" or gm_masked = "100" else
+             "11000000";
+             
+    -- Hardware Scrolling of atom modes
+    -- mc6847_addrb -> mc6847_addrb_hw
+    
+    process (width32, lines, scroll_h, scroll_v, mc6847_addrb)
+    variable y : std_logic_vector(8 downto 0);
+    begin
+        if (width32 = '0') then
+            mc6847_addrb_hw(3 downto 0) <= mc6847_addrb(3 downto 0) + scroll_h(3 downto 0);
+            y := ('0' & mc6847_addrb(11 downto 4)) + ('0' & scroll_v);
+            if (y < lines) then
+                mc6847_addrb_hw(12 downto 4) <= y;
+            else
+                mc6847_addrb_hw(12 downto 4) <= y - lines;
+            end if;
+        else
+            mc6847_addrb_hw(4 downto 0) <= mc6847_addrb(4 downto 0) + scroll_h(4 downto 0);
+            y := ('0' & mc6847_addrb(12 downto 5)) + ('0' & scroll_v);
+            if (y < lines) then
+                mc6847_addrb_hw(12 downto 5) <= y(7 downto 0);
+            else
+                mc6847_addrb_hw(12 downto 5) <= y(7 downto 0) - lines;
+            end if;
+        end if;
+
+    end process;
+    
+    
+    
     -- 1 Bit RGB Video to PL4 Connectors
     OA  <= final_red    when nPL4 = '0' else '0';
     CHB <= final_green1 when nPL4 = '0' else '0';
