@@ -224,6 +224,7 @@ architecture BEHAVIORAL of Top is
     signal vga80_char_a  : std_logic_vector (10 downto 0);
     signal vga80_char_d  : std_logic_vector (7 downto 0);
     signal vga80_addrb   : std_logic_vector (12 downto 0);
+    signal vga80_addrb_hw: std_logic_vector (12 downto 0);
     
     component DCM0
         port(
@@ -799,7 +800,9 @@ begin
     final_char_a <= mc6847_char_a   when vga80x40mode = '0' else vga80_char_a;
     addrb        <= mc6847_addrb    when vga80x40mode = '0' and hwscrollmode = '0' else
                     mc6847_addrb_hw when vga80x40mode = '0' and hwscrollmode = '1' else
-                    vga80_addrb;
+                    vga80_addrb     when hwscrollmode = '0' else
+                    vga80_addrb_hw;
+                    
 
     -- 32 bytes wide in Modes 0, 2a, 3a, 4a, 4
     -- 16 bytes wide in Modes 1a, 1, 2, 3
@@ -840,7 +843,27 @@ begin
     end process;
     
     
+    -- Hardware Scrolling of vga80x40 mode
+    -- vga80_addrb -> vga80_addrb_hw
     
+    process (scroll_h, scroll_v, vga80_addrb)
+    variable display_start : std_logic_vector(11 downto 0);
+    variable addr : std_logic_vector(13 downto 0);
+    begin
+        -- calculate the display start as 80 * scroll_v + scroll_h
+        display_start := (scroll_v(5 downto 0) & "000000") + ("00" & scroll_v(5 downto 0) & "0000") + ("0000" & scroll_h);
+
+        -- calculate the new screen start address, extending the precision by one bit
+        addr := ('0' & vga80_addrb) + ("00" & display_start);
+         
+        -- detect wrapping in wrapping in the character and attributevregions
+        if ((vga80_addrb < 3200 and addr >= 3200) or addr  >= 6400) then
+            vga80_addrb_hw <= addr - 3200;
+        else
+            vga80_addrb_hw <= addr(12 downto 0);
+        end if;
+    end process;
+   
     -- 1 Bit RGB Video to PL4 Connectors
     OA  <= final_red    when nPL4 = '0' else '0';
     CHB <= final_green1 when nPL4 = '0' else '0';
