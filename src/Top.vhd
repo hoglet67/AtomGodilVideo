@@ -370,6 +370,39 @@ architecture BEHAVIORAL of Top is
             );
     end component;
 
+    function modulo5 (x : std_logic_vector(7 downto 0))
+        return std_logic_vector is
+
+        variable tmp1 : std_logic_vector(4 downto 0);
+        variable tmp2 : std_logic_vector(3 downto 0);
+
+    begin
+        -- uses some tricks from here:
+        -- http://homepage.cs.uiowa.edu/~jones/bcd/mod.shtml
+
+        -- calculate modulo 15
+        tmp1 := ('0' & X(7 downto 4)) + ('0' & X(3 downto 0));
+        if (tmp1 = 30) then
+            tmp1 := "00000";
+        elsif (tmp1 >= 15) then
+            tmp1 := tmp1 - 15;
+        end if;
+
+        -- calculate modulo 5
+        tmp2 := tmp1(3 downto 0);
+        if (tmp2 >= 10) then
+            tmp2 := tmp2 - 5;
+        end if;
+
+        if (tmp2 >= 5) then
+            tmp2 := tmp2 - 5;
+        end if;
+
+        return tmp2(2 downto 0);
+        
+
+    end modulo5;
+
 begin
 
     reset <= '0';
@@ -847,22 +880,50 @@ begin
     -- vga80_addrb -> vga80_addrb_hw
     
     process (scroll_h, scroll_v, vga80_addrb)
+    variable addr1 : std_logic_vector(11 downto 0);
+    variable addr2 : std_logic_vector(13 downto 0);
+    variable attr : std_logic;
     variable display_start : std_logic_vector(11 downto 0);
-    variable addr : std_logic_vector(13 downto 0);
+    variable x1 : std_logic_vector(6 downto 0);
+    variable x2 : std_logic_vector(7 downto 0);
     begin
-        -- calculate the display start as 80 * scroll_v + scroll_h
-        display_start := (scroll_v(5 downto 0) & "000000") + ("00" & scroll_v(5 downto 0) & "0000") + ("0000" & scroll_h);
+        -- determine if this is an attribute access or not
+        if (vga80_addrb < 3200) then
+            attr := '0';
+        else
+            attr := '1';
+        end if;
+
+        -- calculate an address in the range 0..3199 regardless of whether char or attr being accessed
+        if (attr = '0') then
+            addr1 := vga80_addrb(11 downto 0);
+        else
+            addr1 := vga80_addrb - 3200;
+        end if;
+
+        -- calculate x from the address modulo 80
+        x1 := modulo5(addr1(11 downto 4)) & addr1(3 downto 0);
+
+        -- calculate the new x after the scroll_h has been added, modulo 80
+        x2 := ('0' & x1) + ('0' & scroll_h);
+        if (x2 >= 80) then
+            x2 := x2 - 80;
+        end if;
+
+        -- calculate the display start as 80 * scroll_v
+        display_start := (scroll_v(5 downto 0) & "000000") + ("00" & scroll_v(5 downto 0) & "0000");
 
         -- calculate the new screen start address, extending the precision by one bit
-        addr := ('0' & vga80_addrb) + ("00" & display_start);
+        addr2 := ('0' & vga80_addrb) + ("00" & display_start) - ("0000000" & x1) + ("0000000" & x2(6 downto 0));
          
         -- detect wrapping in wrapping in the character and attributevregions
-        if ((vga80_addrb < 3200 and addr >= 3200) or addr  >= 6400) then
-            vga80_addrb_hw <= addr - 3200;
+        if ((attr = '0' and addr2 >= 3200) or addr2  >= 6400) then
+            vga80_addrb_hw <= addr2 - 3200;
         else
-            vga80_addrb_hw <= addr(12 downto 0);
+            vga80_addrb_hw <= addr2(12 downto 0);
         end if;
     end process;
+
    
     -- 1 Bit RGB Video to PL4 Connectors
     OA  <= final_red    when nPL4 = '0' else '0';
