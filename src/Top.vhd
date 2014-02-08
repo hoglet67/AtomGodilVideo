@@ -94,6 +94,9 @@ end Top;
 
 architecture BEHAVIORAL of Top is
 
+    constant MAJOR_VERSION : std_logic_vector(3 downto 0) := "0001";
+    constant MINOR_VERSION : std_logic_vector(3 downto 0) := "0000";
+
     -- Set this to 0 if you want dark green/dark orange background on text
     -- Set this to 1 if you want black background on text (authentic Atom)
     constant BLACK_BACKGND : std_logic := '1';
@@ -637,13 +640,13 @@ begin
                   scroll_v <= reg_di;
                 when "01010" =>
                   pointer_nr <= reg_di;
-                when "01100" =>
+                when "01011" =>
                   scroll_left <= reg_di;
-                when "01101" =>
+                when "01100" =>
                   scroll_right <= reg_di;
-                when "01110" =>
+                when "01101" =>
                   scroll_top <= reg_di;
-                when "01111" =>
+                when "01110" =>
                   scroll_bottom <= reg_di;
                   
                 when others =>
@@ -777,8 +780,8 @@ begin
     
     -- Signals driving the internal registers
     -- When nSIDD=0 the registers are mapped to BDE0-BDFF
-    -- When nSIDD=1 the registers are mapped to 9EC0-9EFF
-    reg_cs <= '1' when (nSIDD = '1' and nMS2 = '0' and DA2(12 downto 5) =  "11111110") or
+    -- When nSIDD=1 the registers are mapped to 9FE0-9FFF
+    reg_cs <= '1' when (nSIDD = '1' and nMS2 = '0' and DA2(12 downto 5) =  "11111111") or
                        (nSIDD = '0' and nBXXX2 = '0' and DA2(11 downto 5) = "1101111") 
                   else '0';
 
@@ -803,18 +806,18 @@ begin
               pointer_x     when reg_addr = "01000" else
               pointer_y_inv when reg_addr = "01001" else
               pointer_nr_rd when reg_addr = "01010" else
-              "10101010"    when reg_addr = "01011" else
-              scroll_left   when reg_addr = "01100" else
-              scroll_right  when reg_addr = "01101" else
-              scroll_top    when reg_addr = "01110" else
-              scroll_bottom when reg_addr = "01111" else
+              scroll_left   when reg_addr = "01011" else
+              scroll_right  when reg_addr = "01100" else
+              scroll_top    when reg_addr = "01101" else
+              scroll_bottom when reg_addr = "01110" else
+              MAJOR_VERSION & MINOR_VERSION when reg_addr = "01111" else
               char_reg;
     
     
     -- Signals driving the SID
-    -- When nSIDD=0 the SID is mapped to BDC0-BDCF
-    -- When nSIDD=1 the SID is mapped to 9EF0-9FFF
-    sid_cs <= '1' when (nSIDD = '1' and nMS2 = '0' and DA2(12 downto 5) =  "11111111") or
+    -- When nSIDD=0 the SID is mapped to BDC0-BDDF
+    -- When nSIDD=1 the SID is mapped to 9FC0-9FDF
+    sid_cs <= '1' when (nSIDD = '1' and nMS2 = '0' and DA2(12 downto 5) =  "11111110") or
                        (nSIDD = '0' and nBXXX2 = '0' and DA2(11 downto 5) = "1101110") 
                   else '0';
 
