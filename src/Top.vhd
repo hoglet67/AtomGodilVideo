@@ -198,9 +198,13 @@ architecture BEHAVIORAL of Top is
     signal pointer_middle : std_logic;
     signal pointer_right  : std_logic;
 
-    signal hwscrollmode  : std_logic;
+    signal hwscrollmode   : std_logic;
     
+    signal scroll_left    : std_logic_vector (7 downto 0);
+    signal scroll_right   : std_logic_vector (7 downto 0);
     signal scroll_h       : std_logic_vector (7 downto 0);
+    signal scroll_top     : std_logic_vector (7 downto 0);
+    signal scroll_bottom  : std_logic_vector (7 downto 0);
     signal scroll_v       : std_logic_vector (7 downto 0);
     
     signal width32        : std_logic;
@@ -606,7 +610,11 @@ begin
                 octl2 <= "00000000";
                 pointer_nr <= "10000000";
                 scroll_h <= (others => '0');
+                scroll_left <= (others => '0');
+                scroll_right <= (others => '0');
                 scroll_v <= (others => '0');
+                scroll_top <= (others => '0');
+                scroll_bottom <= (others => '0');
             elsif (reg_cs = '1' and reg_we = '1') then
                 case reg_addr is
                 -- extensions register
@@ -629,6 +637,14 @@ begin
                   scroll_v <= reg_di;
                 when "01010" =>
                   pointer_nr <= reg_di;
+                when "01100" =>
+                  scroll_left <= reg_di;
+                when "01101" =>
+                  scroll_right <= reg_di;
+                when "01110" =>
+                  scroll_top <= reg_di;
+                when "01111" =>
+                  scroll_bottom <= reg_di;
                   
                 when others =>
                   
@@ -788,10 +804,10 @@ begin
               pointer_y_inv when reg_addr = "01001" else
               pointer_nr_rd when reg_addr = "01010" else
               "10101010"    when reg_addr = "01011" else
-              "10101010"    when reg_addr = "01100" else
-              "10101010"    when reg_addr = "01101" else
-              "10101010"    when reg_addr = "01110" else
-              "10101010"    when reg_addr = "01111" else
+              scroll_left   when reg_addr = "01100" else
+              scroll_right  when reg_addr = "01101" else
+              scroll_top    when reg_addr = "01110" else
+              scroll_bottom when reg_addr = "01111" else
               char_reg;
     
     
@@ -842,38 +858,59 @@ begin
     width32 <= '1' when ag_masked = '0' or 
                 gm_masked = "010" or gm_masked = "100" or 
                 gm_masked = "110" or gm_masked = "111" else '0';
-    
-    
-    lines <= "00010000" when ag_masked = '0' else
+                
+                
+     lines <= "00010000" when ag_masked = '0' else
              "01000000" when gm_masked = "000" or gm_masked = "001" or gm_masked = "010" else
              "01100000" when gm_masked = "011" or gm_masked = "100" else
-             "11000000";
+             "11000000";                               
              
     -- Hardware Scrolling of atom modes
     -- mc6847_addrb -> mc6847_addrb_hw
-    
-    process (width32, lines, scroll_h, scroll_v, mc6847_addrb)
+
+    process (width32, scroll_left, scroll_right, scroll_h, scroll_top, scroll_bottom, scroll_v, mc6847_addrb)
+    variable x : std_logic_vector(5 downto 0);
     variable y : std_logic_vector(8 downto 0);
+    variable scroll_h_min : std_logic_vector(7 downto 0);
+    variable scroll_h_max : std_logic_vector(7 downto 0);
+    variable scroll_v_min : std_logic_vector(7 downto 0);
+    variable scroll_v_max : std_logic_vector(7 downto 0);
+
     begin
+        scroll_h_min := scroll_left;
+        scroll_v_min := scroll_top;
+        scroll_v_max := lines - scroll_bottom;
         if (width32 = '0') then
-            mc6847_addrb_hw(3 downto 0) <= mc6847_addrb(3 downto 0) + scroll_h(3 downto 0);
-            y := ('0' & mc6847_addrb(11 downto 4)) + ('0' & scroll_v);
-            if (y < lines) then
-                mc6847_addrb_hw(12 downto 4) <= y;
-            else
-                mc6847_addrb_hw(12 downto 4) <= y - lines;
-            end if;
+            x := "00" & mc6847_addrb(3 downto 0);
+            y := "0" & mc6847_addrb(11 downto 4);
+            scroll_h_max := 16 - scroll_right;
         else
-            mc6847_addrb_hw(4 downto 0) <= mc6847_addrb(4 downto 0) + scroll_h(4 downto 0);
-            y := ('0' & mc6847_addrb(12 downto 5)) + ('0' & scroll_v);
-            if (y < lines) then
-                mc6847_addrb_hw(12 downto 5) <= y(7 downto 0);
-            else
-                mc6847_addrb_hw(12 downto 5) <= y(7 downto 0) - lines;
+            x := "0" & mc6847_addrb(4 downto 0);
+            y := "0" & mc6847_addrb(12 downto 5);        
+            scroll_h_max := 32 - scroll_right;
+        end if;
+            
+        if (x >= scroll_h_min and x < scroll_h_max) and (y >= scroll_v_min and y < scroll_v_max) then
+            x := x + scroll_h;
+            if (x >= scroll_h_max) then
+                x := x - (scroll_h_max - scroll_h_min);
             end if;
+            y := y + scroll_v;
+            if (y >= scroll_v_max) then
+                y := y - (scroll_v_max - scroll_v_min);
+            end if;
+        end if;
+            
+        if (width32 = '0') then
+            mc6847_addrb_hw(3 downto 0) <= x(3 downto 0);
+            mc6847_addrb_hw(12 downto 4) <= y;
+        else
+            mc6847_addrb_hw(4 downto 0) <= x(4 downto 0);
+            mc6847_addrb_hw(12 downto 5) <= y(7 downto 0);
         end if;
 
     end process;
+
     
     
     -- Hardware Scrolling of vga80x40 mode
