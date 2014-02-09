@@ -6,22 +6,22 @@ L004C      = $0081
 L004D      = $0082
 L004F      = $0082
 
-LD400      = $9FE0
-LD401      = $9FE1
-LD403      = $9FE3
-LD404      = $9FE4
-LD405      = $9FE5
-LD407      = $9FE7
-LD408      = $9FE8
-LD40A      = $9FEA
-LD40B      = $9FEB
-LD40C      = $9FEC
-LD40E      = $9FEE
-LD40F      = $9FEF
-LD411      = $9FF1
-LD412      = $9FF2
-LD413      = $9FF3
-LD418      = $9FF8
+LD400      = $9FC0
+LD401      = $9FC1
+LD403      = $9FC3
+LD404      = $9FC4
+LD405      = $9FC5
+LD407      = $9FC7
+LD408      = $9FC8
+LD40A      = $9FCA
+LD40B      = $9FCB
+LD40C      = $9FCC
+LD40E      = $9FCE
+LD40F      = $9FCF
+LD411      = $9FD1
+LD412      = $9FD2
+LD413      = $9FD3
+LD418      = $9FD8
 
 ;-------------------------------------------------
 ; Repton tune (The hustler)
