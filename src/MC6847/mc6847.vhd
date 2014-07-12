@@ -36,10 +36,8 @@ entity mc6847 is
             artifact_phase : in  std_logic;
             cvbs           : out std_logic_vector(7 downto 0);
             black_backgnd  : in  std_logic;
-            char_ram_clk   : in  std_logic;
-            char_ram_we    : in  std_logic;
-            char_ram_addr  : in  std_logic_vector(10 downto 0);
-            char_ram_di    : in  std_logic_vector(7 downto 0)
+            char_a         : out std_logic_vector(10 downto 0);
+            char_d_o       : in std_logic_vector(7 downto 0)
             );
 end mc6847;
 
@@ -97,7 +95,6 @@ architecture SYN of mc6847 is
     signal inv_s      : std_logic;
 
     -- VGA signals
-    signal vga_clk_ena      : std_logic;
     signal vga_hsync        : std_logic;
     signal vga_vsync        : std_logic;
     signal vga_hblank       : std_logic;
@@ -131,8 +128,6 @@ architecture SYN of mc6847 is
     signal da0_int : std_logic_vector(4 downto 0);
 
     -- character rom signals
-    signal char_a               : std_logic_vector(10 downto 0);
-    signal char_d_o             : std_logic_vector(7 downto 0);
     signal cvbs_linebuf_we_r    : std_logic;
     signal cvbs_linebuf_addr_r  : std_logic_vector(8 downto 0);
     signal cvbs_linebuf_we_rr   : std_logic;
@@ -220,7 +215,6 @@ begin
                 cvbs_clk_ena <= toggle;
                 toggle       := not toggle;
             end if;
-            vga_clk_ena <= clk_ena;
         end if;
     end process PROC_CLOCKS;
 
@@ -237,7 +231,7 @@ begin
             vga_vsync  <= '1';
             vga_hblank <= '0';
             
-        elsif rising_edge (clk) and vga_clk_ena = '1' then
+        elsif rising_edge (clk) and clk_ena = '1' then
 
             -- start hsync when cvbs comes out of vblank
             if vga_vblank_r = '1' and vga_vblank = '0' then
@@ -623,7 +617,7 @@ begin
                     end if;
                 end if;
             else
-                if vga_clk_ena = '1' then
+                if clk_ena = '1' then
                     if vga_hblank = '1' then
                         count := '0';
                         p_in  := (others => '0');
@@ -688,7 +682,9 @@ begin
                     VRAM(conv_integer(cvbs_linebuf_addr_rr(8 downto 0))) <= pixel_char_d_o;
                 end if;
             end if;
-            vga_char_d_o <= VRAM(conv_integer(vga_linebuf_addr(8 downto 0)));
+            if clk_ena = '1' then
+                vga_char_d_o <= VRAM(conv_integer(vga_linebuf_addr(8 downto 0)));
+            end if;
         end if;
     end process;
 
@@ -699,20 +695,5 @@ begin
 --            ADDR => char_a,
 --            DATA => char_d_o
 --            );
-
----- ram for char generator      
-    charrom_inst : entity work.CharRam
-        port map(
-            clka  => char_ram_clk,
-            wea   => char_ram_we,
-            addra => char_ram_addr,
-            dina  => char_ram_di,
-            douta => open,
-            clkb  => clk,
-            web   => '0',
-            addrb => char_a,
-            dinb  => (others => '0'),
-            doutb => char_d_o
-        );
 
 end SYN;

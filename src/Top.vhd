@@ -83,19 +83,27 @@ entity Top is
         nSIDD : in std_logic;
         
         -- Active low version of the SID Select Signal for disabling the external bus buffers
-        nSIDSEL : out std_logic
+        nSIDSEL : out std_logic;
+        
+        -- PS/2 Mouse
+        PS2_CLK : inout std_logic;
+        PS2_DATA : inout std_logic
 
         );
 end Top;
 
 architecture BEHAVIORAL of Top is
 
+    constant MAJOR_VERSION : std_logic_vector(3 downto 0) := "0001";
+    constant MINOR_VERSION : std_logic_vector(3 downto 0) := "0000";
+
     -- Set this to 0 if you want dark green/dark orange background on text
     -- Set this to 1 if you want black background on text (authentic Atom)
     constant BLACK_BACKGND : std_logic := '1';
 
-    -- Clock12 is a half speed VGA clock
-    signal clock12 : std_logic;
+    -- clock25 is a full speed VGA clock
+    signal clock25 : std_logic;
+    signal clock25en : std_logic;
     
     -- Other clocks are for SID
     -- 1MHZ, 32MHz and 
@@ -120,6 +128,7 @@ architecture BEHAVIORAL of Top is
     signal DA2  : std_logic_vector (12 downto 0);
     signal DD1  : std_logic_vector (7 downto 0);
     signal DD2  : std_logic_vector (7 downto 0);
+    signal DD3  : std_logic_vector (7 downto 0);
 
     -- VGA colour signals out of mc6847, only top 2 bits are used
     signal vga_red   : std_logic_vector (7 downto 0);
@@ -165,14 +174,65 @@ architecture BEHAVIORAL of Top is
 
     signal extensions : std_logic_vector (7 downto 0);
     signal char_addr : std_logic_vector (7 downto 0);
+    signal ocrx : std_logic_vector (7 downto 0);
+    signal ocry : std_logic_vector (7 downto 0);
+    signal octl : std_logic_vector (7 downto 0);
+    signal octl2 : std_logic_vector (7 downto 0);
     signal char_we : std_logic;
+    signal char_reg : std_logic_vector (7 downto 0);
     
     signal mc6847_an_s : std_logic;
     signal mc6847_intn_ext : std_logic;
     signal mc6847_inv : std_logic;
     signal mc6847_css : std_logic;
     signal mc6847_d : std_logic_vector (7 downto 0);
+    signal mc6847_d_with_pointer : std_logic_vector (7 downto 0);
+    signal mc6847_char_a : std_logic_vector (10 downto 0);
+    signal mc6847_addrb : std_logic_vector (12 downto 0);
+    signal mc6847_addrb_hw : std_logic_vector (12 downto 0);
+    signal char_d_o : std_logic_vector (7 downto 0);
 
+    signal pointer_nr     : std_logic_vector (7 downto 0);
+    signal pointer_nr_rd  : std_logic_vector (7 downto 0);
+    signal pointer_x      : std_logic_vector (7 downto 0);
+    signal pointer_y      : std_logic_vector (7 downto 0);
+    signal pointer_y_inv  : std_logic_vector (7 downto 0);
+    signal pointer_left   : std_logic;
+    signal pointer_middle : std_logic;
+    signal pointer_right  : std_logic;
+
+    signal hwscrollmode   : std_logic;
+    
+    signal scroll_left    : std_logic_vector (7 downto 0);
+    signal scroll_right   : std_logic_vector (7 downto 0);
+    signal scroll_h       : std_logic_vector (7 downto 0);
+    signal scroll_top     : std_logic_vector (7 downto 0);
+    signal scroll_bottom  : std_logic_vector (7 downto 0);
+    signal scroll_v       : std_logic_vector (7 downto 0);
+    
+    signal width32        : std_logic;
+    signal lines          : std_logic_vector (7 downto 0);
+
+    signal vga80x40mode  : std_logic;
+    signal final_red     : std_logic;
+    signal final_green1  : std_logic;
+    signal final_green0  : std_logic;
+    signal final_blue    : std_logic;
+    signal final_vsync   : std_logic;
+    signal final_hsync   : std_logic;
+    signal final_char_a  : std_logic_vector (10 downto 0);
+    
+    signal vga80_R       : std_logic;
+    signal vga80_G       : std_logic;
+    signal vga80_B       : std_logic;
+    signal vga80_vsync   : std_logic;
+    signal vga80_hsync   : std_logic;
+    signal vga80_invert  : std_logic;
+    signal vga80_char_a  : std_logic_vector (10 downto 0);
+    signal vga80_char_d  : std_logic_vector (7 downto 0);
+    signal vga80_addrb   : std_logic_vector (12 downto 0);
+    signal vga80_addrb_hw: std_logic_vector (12 downto 0);
+    
     component DCM0
         port(
             CLKIN_IN  : in  std_logic;
@@ -199,6 +259,26 @@ architecture BEHAVIORAL of Top is
             CLK2X_OUT : out std_logic
             );
     end component;
+
+	component vga80x40
+        port(
+            reset : IN std_logic;
+            clk25MHz : IN std_logic;
+            TEXT_D : IN std_logic_vector(7 downto 0);
+            FONT_D : IN std_logic_vector(7 downto 0);
+            ocrx : IN std_logic_vector(7 downto 0);
+            ocry : IN std_logic_vector(7 downto 0);
+            octl : IN std_logic_vector(7 downto 0);          
+            octl2 : IN std_logic_vector(7 downto 0);          
+            TEXT_A : OUT std_logic_vector(12 downto 0);
+            FONT_A : OUT std_logic_vector(11 downto 0);
+            R : OUT std_logic;
+            G : OUT std_logic;
+            B : OUT std_logic;
+            hsync : OUT std_logic;
+            vsync : OUT std_logic
+            );
+	end component;
 
     component mc6847
         port(
@@ -228,10 +308,8 @@ architecture BEHAVIORAL of Top is
             vblank         : out std_logic;
             cvbs           : out std_logic_vector(7 downto 0);
             black_backgnd  : in  std_logic;
-            char_ram_clk   : in  std_logic;
-            char_ram_we    : in  std_logic;
-            char_ram_addr  : in  std_logic_vector(10 downto 0);
-            char_ram_di    : in  std_logic_vector(7 downto 0)
+            char_a         : out std_logic_vector(10 downto 0);
+            char_d_o       : in std_logic_vector(7 downto 0)
             );
     end component;
 
@@ -249,7 +327,7 @@ architecture BEHAVIORAL of Top is
             doutb : out std_logic_vector(7 downto 0)
             );
     end component;
-    
+
     component sid6581
         port(
             clk_1MHz : in std_logic;
@@ -267,6 +345,70 @@ architecture BEHAVIORAL of Top is
             audio_data : out std_logic_vector(17 downto 0)
             );
     end component;
+    
+    component MouseRefComp
+        port(
+            CLK : IN std_logic;
+            RESOLUTION : IN std_logic;
+            RST : IN std_logic;
+            SWITCH : IN std_logic;    
+            PS2_CLK : INOUT std_logic;
+            PS2_DATA : INOUT std_logic;      
+            LEFT : OUT std_logic;
+            MIDDLE : OUT std_logic;
+            NEW_EVENT : OUT std_logic;
+            RIGHT : OUT std_logic;
+            XPOS : OUT std_logic_vector(9 downto 0);
+            YPOS : OUT std_logic_vector(9 downto 0);
+            ZPOS : OUT std_logic_vector(3 downto 0)
+            );
+    end component;
+
+    component Pointer is
+        port (
+            CLK  : in  std_logic;
+            PO   : in  std_logic;
+            PS   : in  std_logic_vector (4 downto 0);
+            X    : in  std_logic_vector (7 downto 0);
+            Y    : in  std_logic_vector (7 downto 0);
+            ADDR : in  std_logic_vector (12 downto 0);
+            DIN  : in  std_logic_vector (7 downto 0);
+            DOUT : out std_logic_vector (7 downto 0)
+            );
+    end component;
+
+    function modulo5 (x : std_logic_vector(7 downto 0))
+        return std_logic_vector is
+
+        variable tmp1 : std_logic_vector(4 downto 0);
+        variable tmp2 : std_logic_vector(3 downto 0);
+
+    begin
+        -- uses some tricks from here:
+        -- http://homepage.cs.uiowa.edu/~jones/bcd/mod.shtml
+
+        -- calculate modulo 15
+        tmp1 := ('0' & X(7 downto 4)) + ('0' & X(3 downto 0));
+        if (tmp1 = 30) then
+            tmp1 := "00000";
+        elsif (tmp1 >= 15) then
+            tmp1 := tmp1 - 15;
+        end if;
+
+        -- calculate modulo 5
+        tmp2 := tmp1(3 downto 0);
+        if (tmp2 >= 10) then
+            tmp2 := tmp2 - 5;
+        end if;
+
+        if (tmp2 >= 5) then
+            tmp2 := tmp2 - 5;
+        end if;
+
+        return tmp2(2 downto 0);
+        
+
+    end modulo5;
 
 begin
 
@@ -278,7 +420,7 @@ begin
     Inst_DCM0 : DCM0
         port map (
             CLKIN_IN  => clock49,
-            CLK0_OUT  => clock12,
+            CLK0_OUT  => clock25,
             CLK0_OUT1 => open,
             CLK2X_OUT => open
             );
@@ -305,12 +447,12 @@ begin
     -- A further few bugs fixed by myself
     Inst_mc6847 : mc6847
         port map (
-            clk            => clock12,
-            clk_ena        => '1',
+            clk            => clock25,
+            clk_ena        => clock25en,
             reset          => reset,
             da0            => open,
-            videoaddr      => addrb,
-            dd             => mc6847_d,
+            videoaddr      => mc6847_addrb,
+            dd             => mc6847_d_with_pointer,
             hs_n           => open,
             fs_n           => nFS,
             an_g           => ag_masked,
@@ -331,13 +473,47 @@ begin
             vblank         => open,
             cvbs           => open,
             black_backgnd  => BLACK_BACKGND,
-            char_ram_clk   => clock32,
-            char_ram_we    => char_we,
-            char_ram_addr(10 downto 4) => char_addr(6 downto 0),
-            char_ram_addr(3 downto 0) => reg_addr(3 downto 0),
-            char_ram_di    => reg_di
+            char_a         => mc6847_char_a,
+            char_d_o       => char_d_o
             );
     
+	Inst_vga80x40: vga80x40 PORT MAP(
+		reset => reset,
+		clk25MHz => clock25,
+		TEXT_A => vga80_addrb,
+		TEXT_D => mc6847_d,
+		FONT_A(10 downto 0) => vga80_char_a,
+		FONT_A(11) => vga80_invert,
+		FONT_D => vga80_char_d,
+		ocrx => ocrx,
+		ocry => ocry,
+		octl => octl,
+		octl2 => octl2,
+		R => vga80_R,
+		G => vga80_G,
+		B => vga80_B,
+		hsync => vga80_hsync,
+		vsync => vga80_vsync 
+	);
+
+    vga80_char_d <= char_d_o when vga80_invert='0' else char_d_o xor "11111111"; 
+    ---- ram for char generator      
+    charrom_inst : entity work.CharRam
+        port map(
+            clka  => clock32,
+            wea   => char_we,
+            addra(10 downto 4) => char_addr(6 downto 0),
+            addra(3 downto 0) => reg_addr(3 downto 0),
+            dina  => reg_di,
+            douta => char_reg,
+            clkb  => clock25,
+            web   => '0',
+            addrb => final_char_a,
+            dinb  => (others => '0'),
+            doutb => char_d_o
+        );
+
+
     -- 8Kx8 Dual port video RAM
     -- Port A connects to Atom and is read/write
     -- Port B connects to MC6847 and is read only    
@@ -348,7 +524,7 @@ begin
             addra => addra,
             dina  => dina,
             douta => douta,
-            clkb  => clock12,
+            clkb  => clock25,
             web   => '0',
             addrb => addrb,
             dinb  => (others => '0'),
@@ -372,6 +548,34 @@ begin
             audio_data => open 
         );
 
+    Inst_Pointer: Pointer PORT MAP (
+        CLK => clock25,
+        PO => not pointer_nr(7),
+        PS => pointer_nr(4 downto 0),
+        X  => pointer_x,
+        Y  => pointer_y,
+        ADDR => mc6847_addrb, 
+        DIN  => mc6847_d, 
+        DOUT => mc6847_d_with_pointer
+    );
+    
+    Inst_MouseRefComp: MouseRefComp PORT MAP(
+        CLK => clock49,
+        RESOLUTION => '1', -- select 256x192 resolution
+        RST => not nRST,
+        SWITCH => '0',
+        LEFT => pointer_left,
+        MIDDLE => pointer_middle,
+        NEW_EVENT => open,
+        RIGHT => pointer_right,
+        XPOS(7 downto 0) => pointer_x,
+        XPOS(9 downto 8) => open,
+        YPOS(7 downto 0) => pointer_y,
+        YPOS(9 downto 8) => open,
+        ZPOS => open,
+        PS2_CLK => PS2_CLK,
+    	PS2_DATA => PS2_DATA
+	);    
 
     -- Pipelined version of address/data/write signals
     process (clock32)
@@ -385,6 +589,7 @@ begin
             nWRMS1 <= nWR or nMS;
             nWR2 <= nWR1;
             nWR1 <= nWR;
+            DD3  <= DD2;
             DD2  <= DD1;
             DD1  <= DD;
             DA2  <= DA1;
@@ -400,6 +605,19 @@ begin
             if (nRST = '0') then
                 extensions <= (others => '0');
                 char_addr <= (others => '0');
+                ocrx <= (others => '0');
+                ocry <= (others => '0');
+                -- Default to Green Foreground
+                octl <= "10000010";
+                -- Default to Black Background
+                octl2 <= "00000000";
+                pointer_nr <= "10000000";
+                scroll_h <= (others => '0');
+                scroll_left <= (others => '0');
+                scroll_right <= (others => '0');
+                scroll_v <= (others => '0');
+                scroll_top <= (others => '0');
+                scroll_bottom <= (others => '0');
             elsif (reg_cs = '1' and reg_we = '1') then
                 case reg_addr is
                 -- extensions register
@@ -408,7 +626,31 @@ begin
                 -- char_addr register
                 when "00001" =>
                   char_addr <= reg_di;
+                when "00010" =>
+                  ocrx <= reg_di;
+                when "00011" =>
+                  ocry <= reg_di;
+                when "00100" =>
+                  octl <= reg_di;
+                when "00101" =>
+                  octl2 <= reg_di;
+                when "00110" =>
+                  scroll_h <= reg_di;
+                when "00111" =>
+                  scroll_v <= reg_di;
+                when "01010" =>
+                  pointer_nr <= reg_di;
+                when "01011" =>
+                  scroll_left <= reg_di;
+                when "01100" =>
+                  scroll_right <= reg_di;
+                when "01101" =>
+                  scroll_top <= reg_di;
+                when "01110" =>
+                  scroll_bottom <= reg_di;
+                  
                 when others =>
+                  
                 end case;
             end if;
         end if;
@@ -533,13 +775,13 @@ begin
     -- Signals driving the VRAM
     -- Write just before the rising edge of nWR
     wr    <= '1' when (nWRMS1 = '1' and nWRMS2 = '0') else '0';
-    dina  <= DD2;
+    dina  <= DD3;
     addra <= DA2;
     
     -- Signals driving the internal registers
     -- When nSIDD=0 the registers are mapped to BDE0-BDFF
-    -- When nSIDD=1 the registers are mapped to 9EC0-9EFF
-    reg_cs <= '1' when (nSIDD = '1' and nMS2 = '0' and DA2(12 downto 5) =  "11111110") or
+    -- When nSIDD=1 the registers are mapped to 9FE0-9FFF
+    reg_cs <= '1' when (nSIDD = '1' and nMS2 = '0' and DA2(12 downto 5) =  "11111111") or
                        (nSIDD = '0' and nBXXX2 = '0' and DA2(11 downto 5) = "1101111") 
                   else '0';
 
@@ -547,13 +789,35 @@ begin
                        (nSIDD = '0' and nWR1 = '1' and nWR2 = '0')
                   else '0';
 
-    reg_di <= DD2;
+    pointer_nr_rd <= pointer_nr(7) & "1111" & not pointer_middle & not pointer_right & not pointer_left;
+    
+    reg_di <= DD3;
     reg_addr <= DA2(4 downto 0);
-
+    pointer_y_inv <= pointer_y xor "11111111";
+    
+    reg_do <= extensions    when reg_addr = "00000" else
+              char_addr     when reg_addr = "00001" else
+              ocrx          when reg_addr = "00010" else
+              ocry          when reg_addr = "00011" else
+              octl          when reg_addr = "00100" else
+              octl2         when reg_addr = "00101" else
+              scroll_h      when reg_addr = "00110" else
+              scroll_v      when reg_addr = "00111" else
+              pointer_x     when reg_addr = "01000" else
+              pointer_y_inv when reg_addr = "01001" else
+              pointer_nr_rd when reg_addr = "01010" else
+              scroll_left   when reg_addr = "01011" else
+              scroll_right  when reg_addr = "01100" else
+              scroll_top    when reg_addr = "01101" else
+              scroll_bottom when reg_addr = "01110" else
+              MAJOR_VERSION & MINOR_VERSION when reg_addr = "01111" else
+              char_reg;
+    
+    
     -- Signals driving the SID
-    -- When nSIDD=0 the SID is mapped to BDC0-BDCF
-    -- When nSIDD=1 the SID is mapped to 9EF0-9FFF
-    sid_cs <= '1' when (nSIDD = '1' and nMS2 = '0' and DA2(12 downto 5) =  "11111111") or
+    -- When nSIDD=0 the SID is mapped to BDC0-BDDF
+    -- When nSIDD=1 the SID is mapped to 9FC0-9FDF
+    sid_cs <= '1' when (nSIDD = '1' and nMS2 = '0' and DA2(12 downto 5) =  "11111110") or
                        (nSIDD = '0' and nBXXX2 = '0' and DA2(11 downto 5) = "1101110") 
                   else '0';
 
@@ -562,39 +826,168 @@ begin
                   else '0';
 
     char_we <= '1' when reg_cs = '1' and reg_we = '1' and char_addr(7) = '1' and reg_addr(4) = '1' else '0';
-    sid_di <= DD2;
+    sid_di <= DD3;
     sid_addr <= DA2(4 downto 0);
     
     -- Tri-state data back to the Atom
-    dout <= sid_do when sid_cs = '1' else douta;
+    dout <= sid_do when sid_cs = '1' else
+            reg_do when reg_cs = '1' else
+            douta;
     DD    <= dout when (nMS = '0' and nWR = '1') else (others => 'Z');
     
     -- Output the SID Select Signal so it can be used to disable the bus buffers
 
     nSIDSEL <= not sid_cs;
-    
-    -- 1 Bit RGB Video to PL4 Connectors
-    OA  <= vga_red(7)    when nPL4 = '0' else '0';
-    CHB <= vga_green(7)  when nPL4 = '0' else '0';
-    OB  <= vga_blue(7)   when nPL4 = '0' else '0';
-    nHS <= vga_hsync     when nPL4 = '0' else '0';
-    Y   <= vga_vsync     when nPL4 = '0' else '0';
 
+    -- VGA Multiplexing between two controllers
+    
+    vga80x40mode <= extensions(7);
+    hwscrollmode <= extensions(6);
+    final_red    <= vga_red(7)      when vga80x40mode = '0' else vga80_R;
+    final_green1 <= vga_green(7)    when vga80x40mode = '0' else vga80_G;
+    final_green0 <= vga_green(6)    when vga80x40mode = '0' else vga80_G;
+    final_blue   <= vga_blue(7)     when vga80x40mode = '0' else vga80_B;
+    final_vsync  <= vga_vsync       when vga80x40mode = '0' else vga80_vsync;
+    final_hsync  <= vga_hsync       when vga80x40mode = '0' else vga80_hsync;
+    final_char_a <= mc6847_char_a   when vga80x40mode = '0' else vga80_char_a;
+    addrb        <= mc6847_addrb    when vga80x40mode = '0' and hwscrollmode = '0' else
+                    mc6847_addrb_hw when vga80x40mode = '0' and hwscrollmode = '1' else
+                    vga80_addrb     when hwscrollmode = '0' else
+                    vga80_addrb_hw;
+                    
+
+    -- 32 bytes wide in Modes 0, 2a, 3a, 4a, 4
+    -- 16 bytes wide in Modes 1a, 1, 2, 3
+    width32 <= '1' when ag_masked = '0' or 
+                gm_masked = "010" or gm_masked = "100" or 
+                gm_masked = "110" or gm_masked = "111" else '0';
+                
+                
+     lines <= "00010000" when ag_masked = '0' else
+             "01000000" when gm_masked = "000" or gm_masked = "001" or gm_masked = "010" else
+             "01100000" when gm_masked = "011" or gm_masked = "100" else
+             "11000000";                               
+             
+    -- Hardware Scrolling of atom modes
+    -- mc6847_addrb -> mc6847_addrb_hw
+
+    process (width32, scroll_left, scroll_right, scroll_h, scroll_top, scroll_bottom, scroll_v, mc6847_addrb)
+    variable x : std_logic_vector(5 downto 0);
+    variable y : std_logic_vector(8 downto 0);
+    variable scroll_h_min : std_logic_vector(7 downto 0);
+    variable scroll_h_max : std_logic_vector(7 downto 0);
+    variable scroll_v_min : std_logic_vector(7 downto 0);
+    variable scroll_v_max : std_logic_vector(7 downto 0);
+
+    begin
+        scroll_h_min := scroll_left;
+        scroll_v_min := scroll_top;
+        scroll_v_max := lines - scroll_bottom;
+        if (width32 = '0') then
+            x := "00" & mc6847_addrb(3 downto 0);
+            y := "0" & mc6847_addrb(11 downto 4);
+            scroll_h_max := 16 - scroll_right;
+        else
+            x := "0" & mc6847_addrb(4 downto 0);
+            y := "0" & mc6847_addrb(12 downto 5);        
+            scroll_h_max := 32 - scroll_right;
+        end if;
+            
+        if (x >= scroll_h_min and x < scroll_h_max) and (y >= scroll_v_min and y < scroll_v_max) then
+            x := x + scroll_h;
+            if (x >= scroll_h_max) then
+                x := x - (scroll_h_max - scroll_h_min);
+            end if;
+            y := y + scroll_v;
+            if (y >= scroll_v_max) then
+                y := y - (scroll_v_max - scroll_v_min);
+            end if;
+        end if;
+            
+        if (width32 = '0') then
+            mc6847_addrb_hw(3 downto 0) <= x(3 downto 0);
+            mc6847_addrb_hw(12 downto 4) <= y;
+        else
+            mc6847_addrb_hw(4 downto 0) <= x(4 downto 0);
+            mc6847_addrb_hw(12 downto 5) <= y(7 downto 0);
+        end if;
+
+    end process;
+
+    
+    
+    -- Hardware Scrolling of vga80x40 mode
+    -- vga80_addrb -> vga80_addrb_hw
+    
+    process (scroll_h, scroll_v, vga80_addrb)
+    variable addr1 : std_logic_vector(11 downto 0);
+    variable addr2 : std_logic_vector(13 downto 0);
+    variable attr : std_logic;
+    variable display_start : std_logic_vector(11 downto 0);
+    variable x1 : std_logic_vector(6 downto 0);
+    variable x2 : std_logic_vector(7 downto 0);
+    begin
+        -- determine if this is an attribute access or not
+        if (vga80_addrb < 3200) then
+            attr := '0';
+        else
+            attr := '1';
+        end if;
+
+        -- calculate an address in the range 0..3199 regardless of whether char or attr being accessed
+        if (attr = '0') then
+            addr1 := vga80_addrb(11 downto 0);
+        else
+            addr1 := vga80_addrb - 3200;
+        end if;
+
+        -- calculate x from the address modulo 80
+        x1 := modulo5(addr1(11 downto 4)) & addr1(3 downto 0);
+
+        -- calculate the new x after the scroll_h has been added, modulo 80
+        x2 := ('0' & x1) + ('0' & scroll_h);
+        if (x2 >= 80) then
+            x2 := x2 - 80;
+        end if;
+
+        -- calculate the display start as 80 * scroll_v
+        display_start := (scroll_v(5 downto 0) & "000000") + ("00" & scroll_v(5 downto 0) & "0000");
+
+        -- calculate the new screen start address, extending the precision by one bit
+        addr2 := ('0' & vga80_addrb) + ("00" & display_start) - ("0000000" & x1) + ("0000000" & x2(6 downto 0));
+         
+        -- detect wrapping in wrapping in the character and attributevregions
+        if ((attr = '0' and addr2 >= 3200) or addr2  >= 6400) then
+            vga80_addrb_hw <= addr2 - 3200;
+        else
+            vga80_addrb_hw <= addr2(12 downto 0);
+        end if;
+    end process;
+
+   
+    -- 1 Bit RGB Video to PL4 Connectors
+    OA  <= final_red    when nPL4 = '0' else '0';
+    CHB <= final_green1 when nPL4 = '0' else '0';
+    OB  <= final_blue   when nPL4 = '0' else '0';
+    nHS <= final_hsync  when nPL4 = '0' else '0';
+    Y   <= final_vsync  when nPL4 = '0' else '0';
+    
     -- RGB mapping
-    R(0) <= vga_red(7);
-    G(1) <= vga_green(7);
-    G(0) <= vga_green(6);
-    B(0) <= vga_blue(7);
-    VSYNC <= vga_vsync;
-    HSYNC <= vga_hsync;
+    R(0)  <= final_red;
+    G(1)  <= final_green1;
+    G(0)  <= final_green0;
+    B(0)  <= final_blue;
+    VSYNC <= final_vsync;
+    HSYNC <= final_hsync;
+    
     AUDIO <= sid_audio;
 
     -- Hold internal reset low for two frames after nRST released
     -- This avoids any diaplay glitches
-    process (Clock12)
+    process (clock25)
     variable state : std_logic_vector(2 downto 0);
     begin
-        if rising_edge(Clock12) then
+        if rising_edge(clock25) then
             if (nRST = '0') then
                 state := "000";
             elsif (state = "000" and vga_vsync = '0') then
@@ -609,6 +1002,14 @@ begin
             mask <= state(2);
         end if;
     end process;
+    
+    process (clock25)
+    begin
+        if rising_edge(clock25) then
+            clock25en <= not clock25en;
+        end if;
+    end process;
+    
     
     -- During reset, force the 6847 mode select inputs low
     -- (this is necessary to stop the mode changing during reset, as the GODIL has 1.5K pullups)

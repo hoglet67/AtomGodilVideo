@@ -4,7 +4,7 @@
 ;this player was used (with small mods)
 ;for his first approx 30 musix
 
-sid	= $9fe0
+sid	= $9fc0
 
 	jmp initmusic
 	jmp playmusic
