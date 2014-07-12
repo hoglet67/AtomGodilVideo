@@ -177,6 +177,14 @@ architecture BEHAVIORAL of Top is
     end component;
 
     component AtomGodilVideo
+        generic (
+           CImplGraphicsExt : boolean;
+           CImplSoftChar    : boolean;
+           CImplSID         : boolean;
+           CImplVGA80x40    : boolean;
+           CImplHWScrolling : boolean;
+           CImplMouse       : boolean
+        );
         port (
             -- Clock inputs
             -- clock25 is a full speed VGA clock      
@@ -260,9 +268,18 @@ begin
             CLK0_OUT  => clock32,
             CLK0_OUT1 => open,
             CLK2X_OUT => open
-            );            
+            );
             
     Inst_AtomGodilVideo : AtomGodilVideo
+        generic map (
+           CImplGraphicsExt => true,
+           CImplSoftChar    => true,
+           CImplSID         => true,
+           CImplVGA80x40    => true,
+           CImplHWScrolling => true,
+           CImplMouse       => true
+        )
+      
         port map (
             clock25 => clock25,
             clock32 => clock32,
