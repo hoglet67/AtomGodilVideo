@@ -83,12 +83,16 @@ entity Top is
         nSIDD : in std_logic;
         
         -- Active low version of the SID Select Signal for disabling the external bus buffers
-        nSIDSEL : out std_logic;
+        -- nSIDSEL : out std_logic;
         
         -- PS/2 Mouse
         PS2_CLK : inout std_logic;
-        PS2_DATA : inout std_logic
+        PS2_DATA : inout std_logic;
 
+        -- UART
+        uart_TxD : out std_logic;
+        uart_RxD : in  std_logic
+        
         );
 end Top;
 
@@ -137,6 +141,10 @@ architecture BEHAVIORAL of Top is
     signal sid_we : std_logic;
     signal sid_audio : std_logic;
 
+    -- UART sigmals
+    signal uart_cs       : std_logic;
+    signal uart_we       : std_logic;
+    
     -- Atom extension register signals
     signal reg_cs : std_logic;
     signal reg_we : std_logic;
@@ -183,7 +191,8 @@ architecture BEHAVIORAL of Top is
            CImplSID         : boolean;
            CImplVGA80x40    : boolean;
            CImplHWScrolling : boolean;
-           CImplMouse       : boolean
+           CImplMouse       : boolean;
+           CImplUart        : boolean
         );
         port (
             -- Clock inputs
@@ -226,6 +235,14 @@ architecture BEHAVIORAL of Top is
             PS2_CLK      : inout std_logic;
             PS2_DATA     : inout std_logic;
 
+            -- UART signals
+            uart_cs      : in    std_logic;
+            uart_we      : in    std_logic;
+            uart_RxD     : in    std_logic;
+            uart_TxD     : out   std_logic;     
+            uart_escape  : out   std_logic;
+            uart_break   : out   std_logic;  
+            
             -- VGA Signals
             final_red    : out   std_logic;
             final_green1 : out   std_logic;
@@ -277,7 +294,8 @@ begin
            CImplSID         => true,
            CImplVGA80x40    => true,
            CImplHWScrolling => true,
-           CImplMouse       => true
+           CImplMouse       => true,
+           CImplUart        => true
         )
       
         port map (
@@ -301,6 +319,12 @@ begin
             sid_audio => sid_audio,
             PS2_CLK => PS2_CLK,
             PS2_DATA => PS2_DATA,
+            uart_cs => uart_cs,
+            uart_we => uart_we,
+            uart_RxD => uart_RxD,
+            uart_TxD => uart_TxD,
+            uart_escape => open,
+            uart_break => open,
             final_red => final_red,
             final_green1 => final_green1,
             final_green0 => final_green0,
@@ -358,11 +382,23 @@ begin
                        (nSIDD = '0' and nWR1 = '1' and nWR2 = '0')
                   else '0';
 
+
+    -- Signals driving the UART
+    -- When nSIDD=0 the UART is mapped to BDB0-BDBF
+    -- When nSIDD=1 the UART is mapped to 9FB0-9FBF
+    uart_cs <= '1' when (nSIDD = '1' and nMS2 = '0' and DA2(12 downto 4) =  "111111011") or
+                        (nSIDD = '0' and nBXXX2 = '0' and DA2(11 downto 4) = "11011011") 
+                   else '0';
+
+    uart_we <= '1' when (nSIDD = '1' and nWRMS1 = '1' and nWRMS2 = '0') or
+                        (nSIDD = '0' and nWR1 = '1' and nWR2 = '0')
+                   else '0';
+    
     AUDIO <= sid_audio;
 
     -- Output the SID Select Signal so it can be used to disable the bus buffers
     -- TODO: this looks incorrect
-    nSIDSEL <= not sid_cs;
+    -- nSIDSEL <= not sid_cs;
     
     -- Tri-state data back to the Atom
     DD    <= dout when (nMS = '0' and nWR = '1') else (others => 'Z');

@@ -37,7 +37,8 @@ entity AtomGodilVideo is
        CImplSID         : boolean;
        CImplVGA80x40    : boolean;
        CImplHWScrolling : boolean;
-       CImplMouse       : boolean
+       CImplMouse       : boolean;
+       CImplUart        : boolean
     );
     port (
         -- Clock inputs
@@ -58,12 +59,12 @@ entity AtomGodilVideo is
         -- Typically not held low so video
         reset_vid    : in    std_logic;
         
-        -- Main Address / Data Bus
+        -- Main Address / Data Bus signals
         din          : in    std_logic_vector (7 downto 0);
         dout         : out   std_logic_vector (7 downto 0);
         addr         : in    std_logic_vector (12 downto 0);
 
-        -- 6847 Control Signals
+        -- 6847 signals
         CSS          : in    std_logic;
         AG           : in    std_logic;
         GM           : in    std_logic_vector (2 downto 0);
@@ -81,10 +82,18 @@ entity AtomGodilVideo is
         sid_we       : in    std_logic;
         sid_audio    : out   std_logic;
         
-        -- PS/2 Mouse
+        -- PS/2 Mouse signals
         PS2_CLK      : inout std_logic;
         PS2_DATA     : inout std_logic;
 
+        -- UART signals
+        uart_cs      : in    std_logic;
+        uart_we      : in    std_logic;
+        uart_RxD     : in    std_logic;
+        uart_TxD     : out   std_logic;     
+        uart_escape  : out   std_logic;
+        uart_break   : out   std_logic;  
+        
         -- VGA Signals
         final_red    : out   std_logic;
         final_green1 : out   std_logic;
@@ -192,6 +201,8 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal vga80_char_d  : std_logic_vector (7 downto 0);
     signal vga80_addrb   : std_logic_vector (12 downto 0);
     signal vga80_addrb_hw: std_logic_vector (12 downto 0);
+
+    signal uart_do  : std_logic_vector (7 downto 0);
     
     Component vga80x40
         port(
@@ -310,6 +321,26 @@ architecture BEHAVIORAL of AtomGodilVideo is
             );
     end component;
 
+    component miniuart
+        port(
+            wb_clk_i : in std_logic;
+            wb_rst_i : in std_logic;
+            wb_adr_i : in std_logic_vector(1 downto 0);
+            wb_dat_i : in std_logic_vector(7 downto 0);
+            wb_we_i : in std_logic;
+            wb_stb_i : in std_logic;
+            br_clk_i : in std_logic;
+            rxd_pad_i : in std_logic;          
+            wb_dat_o : out std_logic_vector(7 downto 0);
+            wb_ack_o : out std_logic;
+            inttx_o : out std_logic;
+            intrx_o : out std_logic;
+            txd_pad_o : out std_logic;
+            esc_o : out std_logic;
+            break_o : out std_logic
+        );
+    end component;
+    
     function modulo5 (x : std_logic_vector(7 downto 0))
         return std_logic_vector is
 
@@ -478,8 +509,9 @@ begin
               char_reg      when                        CImplSoftChar    else
               x"f1";
 
-    dout <= sid_do when sid_cs = '1' and CimplSID else
-            reg_do when reg_cs = '1' else
+    dout <= sid_do  when sid_cs  = '1' and CimplSID  else
+            uart_do when uart_cs = '1' and CimplUART else
+            reg_do  when reg_cs  = '1'               else
             douta;
 
     -----------------------------------------------------------------------------
@@ -931,7 +963,6 @@ begin
 
     end generate;
   
-
     -----------------------------------------------------------------------------
     -- Optional Mouse
     -----------------------------------------------------------------------------
@@ -989,6 +1020,33 @@ begin
 
         
     end generate;
-    
+
+
+    -----------------------------------------------------------------------------
+    -- Optional Mouse
+    -----------------------------------------------------------------------------
+
+    Optional_Uart: if CImplUart generate
+      
+        inst_miniuart: miniuart port map(
+            wb_clk_i => clock32,
+            wb_rst_i => reset,
+            wb_adr_i => addr(1 downto 0),
+            wb_dat_i => din,
+            wb_dat_o => uart_do,
+            wb_we_i  => uart_we,
+            wb_stb_i => uart_cs,
+            wb_ack_o => open,
+            inttx_o  => open,
+            intrx_o  => open,
+            br_clk_i => clock32,
+            txd_pad_o => uart_TxD,
+            rxd_pad_i => uart_RxD,
+            esc_o     => uart_escape,
+            break_o   => uart_break  
+        );
+
+    end generate;
+        
 end BEHAVIORAL;
 
