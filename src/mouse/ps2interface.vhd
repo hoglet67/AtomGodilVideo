@@ -146,6 +146,7 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
+use IEEE.NUMERIC_STD.ALL;
 
 -- simulation library
 library UNISIM;
@@ -154,6 +155,9 @@ use UNISIM.VComponents.all;
 -- the ps2interface entity declaration
 -- read above for behavioral description and port definitions.
 entity ps2interface is
+generic (
+   MainClockSpeed   : integer
+);
 port(
    ps2_clk  : inout std_logic;
    ps2_data : inout std_logic;
@@ -191,12 +195,14 @@ architecture Behavioral of ps2interface is
 
 -- upper limit for 100us delay counter.
 -- 4915 * 20.34ns = 100us
-constant DELAY_100US : std_logic_vector(13 downto 0):= "01001100110011";
-                                                 -- 10000 clock periods
+--constant DELAY_100US : std_logic_vector(13 downto 0):= "01001100110011";
+constant DELAY_100US : std_logic_vector(13 downto 0):= std_logic_vector(to_unsigned(MainClockSpeed * 100 / 1000000, 14));
+
 -- upper limit for 20us delay counter.
 -- 983 * 20.34ns = 20us
-constant DELAY_20US  : std_logic_vector(10 downto 0) := "01111010111";
-                                                  -- 2000 clock periods
+-- constant DELAY_20US  : std_logic_vector(10 downto 0) := "01111010111";
+constant DELAY_20US  : std_logic_vector(10 downto 0) := std_logic_vector(to_unsigned(MainClockSpeed * 20 / 1000000, 11));
+
 -- upper limit for 63clk delay counter.
 constant DELAY_63CLK : std_logic_vector(5 downto 0)  := "111111";
                                                     -- 63 clock periods

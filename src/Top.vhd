@@ -100,7 +100,7 @@ architecture BEHAVIORAL of Top is
 
     -- clock32 is the main clock
     signal clock32 : std_logic;
-
+    
     -- clock25 is a full speed VGA clock
     signal clock25 : std_logic;
     
@@ -192,20 +192,27 @@ architecture BEHAVIORAL of Top is
            CImplVGA80x40    : boolean;
            CImplHWScrolling : boolean;
            CImplMouse       : boolean;
-           CImplUart        : boolean
+           CImplUart        : boolean;
+           MainClockSpeed   : integer;
+           DefaultBaud      : integer
         );
         port (
-            -- Clock inputs
-            -- clock25 is a full speed VGA clock      
-            clock25      : in    std_logic;
-            clock32      : in    std_logic;
-            clock49      : in    std_logic;
+            -- clock_vga is a full speed VGA clock (25MHz ish)      
+            clock_vga      : in    std_logic;
     
-             -- Reset inputs
+            -- clock_main is the main clock    
+            clock_main      : in    std_logic;
+        
+            -- A fixed 32MHz clock for the SID
+            clock_sid_32MHz  : in    std_logic;
+    
+            -- As fast a clock as possible for the SID DAC
+            clock_sid_dac  : in    std_logic;
+    
+            -- Reset signal (active high)
             reset        : in    std_logic;
     
-            -- Reset signal to 6847 and vga80x40
-            -- Typically not held low so video
+            -- Reset signal to 6847 (active high), not currently used
             reset_vid    : in    std_logic;
             
             -- Main Address / Data Bus
@@ -295,13 +302,16 @@ begin
            CImplVGA80x40    => true,
            CImplHWScrolling => true,
            CImplMouse       => true,
-           CImplUart        => true
+           CImplUart        => true,
+           MainClockSpeed   => 32000000,
+           DefaultBaud      => 115200          
         )
       
         port map (
-            clock25 => clock25,
-            clock32 => clock32,
-            clock49 => clock49,
+            clock_vga => clock25,
+            clock_main => clock32,
+            clock_sid_32Mhz => clock32,
+            clock_sid_dac => clock49,
             reset => reset,
             reset_vid => reset_vid,
             din => din,

@@ -29,7 +29,11 @@ library UNISIM;
 use UNISIM.Vcomponents.ALL;
 
 entity MouseRefComp is
-   port ( CLK        : in    std_logic; 
+        generic (
+           MainClockSpeed   : integer
+        );
+        port (
+          CLK        : in    std_logic; 
           RESOLUTION : in    std_logic; 
           RST        : in    std_logic; 
           SWITCH     : in    std_logic; 
@@ -92,6 +96,9 @@ architecture Structural of MouseRefComp is
    end component;
    
    component ps2interface
+      generic (
+         MainClockSpeed   : integer
+      );
       port ( clk      : in    std_logic; 
              rst      : in    std_logic; 
              read     : out   std_logic; 
@@ -139,6 +146,7 @@ begin
                 value(9 downto 0)=>vecValue(9 downto 0));
    
    Pss2Inst : ps2interface
+      generic map (MainClockSpeed => MainClockSpeed)
       port map (clk=>CLK,
                 rst=>RST,
                 tx_data(7 downto 0)=>TX_DATA(7 downto 0),

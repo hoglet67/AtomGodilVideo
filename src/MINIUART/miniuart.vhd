@@ -35,6 +35,10 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity MINIUART is
+  generic (
+    MainClockSpeed : integer;
+    DefaultBaud : integer
+  );
   port (
 -- Wishbone signals
     WB_CLK_I  : in  std_logic;          -- clock
@@ -169,7 +173,7 @@ BREAKctrl: process(WB_CLK_I)
       if (WB_RST_I = '1') then
         ReadA <= '0';
         LoadA <= '0';
-        Divisor <= std_logic_vector(to_unsigned(68, 16));
+        Divisor <= std_logic_vector(to_unsigned(MainClockSpeed / 4 / DefaultBaud, 16));
       else
         if (WB_STB_I = '1' and WB_WE_I = '1' and WB_ADR_I = "00") then  -- Write Byte to Tx
           TxData <= WB_DAT_I;

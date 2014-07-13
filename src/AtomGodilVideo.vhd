@@ -38,25 +38,27 @@ entity AtomGodilVideo is
        CImplVGA80x40    : boolean;
        CImplHWScrolling : boolean;
        CImplMouse       : boolean;
-       CImplUart        : boolean
+       CImplUart        : boolean;
+       MainClockSpeed   : integer;
+       DefaultBaud      : integer
     );
-    port (
-        -- Clock inputs
-        
-        -- clock25 is a full speed VGA clock      
-        clock25      : in    std_logic;
+    port (        
+        -- clock_vga is a full speed VGA clock (25MHz ish)      
+        clock_vga      : in    std_logic;
 
-        -- clock32 is the main clock      
-        clock32      : in    std_logic;
-        
-        -- clock32 is used for the SID dac and the mouse only
-        clock49      : in    std_logic;
+        -- clock_main is the main clock    
+        clock_main      : in    std_logic;
 
-         -- Reset inputs
+        -- A fixed 32MHz clock for the SID
+        clock_sid_32MHz  : in    std_logic;
+
+        -- As fast a clock as possible for the SID DAC
+        clock_sid_dac  : in    std_logic;
+
+        -- Reset signal (active high)
         reset        : in    std_logic;
 
-        -- Reset signal to 6847 and vga80x40
-        -- Typically not held low so video
+        -- Reset signal to 6847 (active high), not currently used
         reset_vid    : in    std_logic;
         
         -- Main Address / Data Bus signals
@@ -114,10 +116,10 @@ architecture BEHAVIORAL of AtomGodilVideo is
     -- Set this to 1 if you want black background on text (authentic Atom)
     constant BLACK_BACKGND : std_logic := '1';
 
-    signal clock25en : std_logic;
+    signal clock_vga_en : std_logic;
     -- Internal 1MHz clocks for SID
     signal div32  : std_logic_vector (4 downto 0);
-    signal clock1 : std_logic;
+    signal clock_sid_1MHz : std_logic;
     
     -- VGA colour signals out of mc6847, only top 2 bits are used
     signal vga_red   : std_logic_vector (7 downto 0);
@@ -291,6 +293,9 @@ architecture BEHAVIORAL of AtomGodilVideo is
     end component;
     
     component MouseRefComp
+        generic (
+           MainClockSpeed   : integer
+        );
         port(
             CLK : IN std_logic;
             RESOLUTION : IN std_logic;
@@ -322,6 +327,10 @@ architecture BEHAVIORAL of AtomGodilVideo is
     end component;
 
     component miniuart
+        generic (
+            MainClockSpeed : integer;
+            DefaultBaud : integer
+        );
         port(
             wb_clk_i : in std_logic;
             wb_rst_i : in std_logic;
@@ -386,8 +395,8 @@ begin
     -- A further few bugs fixed by myself
     Inst_mc6847 : mc6847
         port map (
-            clk            => clock25,
-            clk_ena        => clock25en,
+            clk            => clock_vga,
+            clk_ena        => clock_vga_en,
             reset          => reset_vid,
             da0            => open,
             videoaddr      => mc6847_addrb,
@@ -423,12 +432,12 @@ begin
     -- Port B connects to MC6847 and is read only    
     Inst_VideoRam : VideoRam
         port map (
-            clka  => clock32,
+            clka  => clock_main,
             wea   => ram_we,
             addra => addr,
             dina  => din,
             douta => douta,
-            clkb  => clock25,
+            clkb  => clock_vga,
             web   => '0',
             addrb => addrb,
             dinb  => (others => '0'),
@@ -456,10 +465,10 @@ begin
 
     -- Hold internal reset low for two frames after nRST released
     -- This avoids any diaplay glitches
-    process (clock25)
+    process (clock_vga)
     variable state : std_logic_vector(2 downto 0);
     begin
-        if rising_edge(clock25) then
+        if rising_edge(clock_vga) then
             if (reset = '1') then
                 state := "000";
             elsif (state = "000" and vga_vsync = '0') then
@@ -475,10 +484,10 @@ begin
         end if;
     end process;
     
-    process (clock25)
+    process (clock_vga)
     begin
-        if rising_edge(clock25) then
-            clock25en <= not clock25en;
+        if rising_edge(clock_vga) then
+            clock_vga_en <= not clock_vga_en;
         end if;
     end process;
         
@@ -510,7 +519,7 @@ begin
               x"f1";
 
     dout <= sid_do  when sid_cs  = '1' and CimplSID  else
-            uart_do when uart_cs = '1' and CimplUART else
+            uart_do when uart_cs = '1' and CimplUart else
             reg_do  when reg_cs  = '1'               else
             douta;
 
@@ -521,9 +530,9 @@ begin
     Optional_SoftChar: if CImplSoftChar generate
 
         -- A register to control extra 6847 features
-        process (clock32)
+        process (clock_main)
         begin
-            if rising_edge(clock32) then
+            if rising_edge(clock_main) then
                 if (reset = '1') then
                     char_addr <= (others => '0');
                 elsif (reg_cs = '1' and reg_we = '1') then
@@ -543,13 +552,13 @@ begin
         ---- ram for char generator      
         charrom_inst : entity work.CharRam
             port map(
-                clka  => clock32,
+                clka  => clock_main,
                 wea   => char_we,
                 addra(10 downto 4) => char_addr(6 downto 0),
                 addra(3 downto 0) => addr(3 downto 0),
                 dina  => din,
                 douta => char_reg,
-                clkb  => clock25,
+                clkb  => clock_vga,
                 web   => '0',
                 addrb => final_char_a,
                 dinb  => (others => '0'),
@@ -563,7 +572,7 @@ begin
         ---- ram for char generator      
         charrom_inst : entity work.CharRom
             port map(
-                CLK  => clock25,
+                CLK  => clock_vga,
                 ADDR => final_char_a,
                 DATA => char_d_o
             );
@@ -577,9 +586,9 @@ begin
     Optional_GraphicsExt: if CImplGraphicsExt generate
 
         -- A register to control extra 6847 features
-        process (clock32)
+        process (clock_main)
         begin
-            if rising_edge(clock32) then
+            if rising_edge(clock_main) then
                 if (reset = '1') then
                     extensions <= (others => '0');
                 elsif (reg_cs = '1' and reg_we = '1') then
@@ -726,9 +735,9 @@ begin
 
         Inst_sid6581: sid6581
             port map (
-                clk_1MHz => clock1,
-                clk32 => clock32,
-                clk_DAC => clock49,
+                clk_1MHz => clock_sid_1MHz,
+                clk32 => clock_sid_32MHz,
+                clk_DAC => clock_sid_dac,
                 reset => reset,
                 cs => sid_cs,
                 we => sid_we,
@@ -741,14 +750,14 @@ begin
                 audio_data => open 
             );
 
-        -- Clock1 is derived by dividing clock32 down by 32
-        process (clock32)
+        -- Clock_Sid_1MHz is derived by dividing down thw 32MHz clock
+        process (clock_sid_32MHz)
         begin
-            if rising_edge(clock32) then
+            if rising_edge(clock_sid_32MHz) then
                 div32 <= div32 + 1;
             end if;
         end process;        
-        clock1 <= div32(4);
+        clock_sid_1MHz <= div32(4);
 
     end generate;
       
@@ -759,9 +768,9 @@ begin
     Optional_VGA80x40: if CImplVGA80x40 generate
 
         -- A register to control extra 6847 features
-        process (clock32)
+        process (clock_main)
         begin
-            if rising_edge(clock32) then
+            if rising_edge(clock_main) then
                 if (reset = '1') then
                     ocrx <= (others => '0');
                     ocry <= (others => '0');
@@ -787,7 +796,7 @@ begin
       
         Inst_vga80x40: vga80x40 PORT MAP(
             reset => reset_vid,
-            clk25MHz => clock25,
+            clk25MHz => clock_vga,
             TEXT_A => vga80_addrb,
             TEXT_D => mc6847_d,
             FONT_A(10 downto 0) => vga80_char_a,
@@ -816,9 +825,9 @@ begin
     Optional_HWScrolling_Atom: if CImplHWScrolling generate
 
         -- A register to control extra 6847 features
-        process (clock32)
+        process (clock_main)
         begin
-            if rising_edge(clock32) then
+            if rising_edge(clock_main) then
                 if (reset = '1') then
                     scroll_h <= (others => '0');
                     scroll_left <= (others => '0');
@@ -970,7 +979,7 @@ begin
     Optional_Mouse: if CImplMouse generate
 
         Inst_Pointer: Pointer PORT MAP (
-            CLK => clock25,
+            CLK => clock_vga,
             PO => not pointer_nr(7),
             PS => pointer_nr(4 downto 0),
             X  => pointer_x,
@@ -980,8 +989,12 @@ begin
             DOUT => mc6847_d_with_pointer
         );
         
-        Inst_MouseRefComp: MouseRefComp PORT MAP(
-            CLK => clock49,
+        Inst_MouseRefComp: MouseRefComp
+        generic map (
+            MainClockSpeed => MainClockSpeed
+        )        
+        PORT MAP (
+            CLK => clock_main,
             RESOLUTION => '1', -- select 256x192 resolution
             RST => reset,
             SWITCH => '0',
@@ -1002,9 +1015,9 @@ begin
     
         pointer_y_inv <= pointer_y xor "11111111";
 
-        process (clock32)
+        process (clock_main)
         begin
-            if rising_edge(clock32) then
+            if rising_edge(clock_main) then
                 if (reset = '1') then
                     pointer_nr <= "10000000";
                 elsif (reg_cs = '1' and reg_we = '1') then
@@ -1028,8 +1041,13 @@ begin
 
     Optional_Uart: if CImplUart generate
       
-        inst_miniuart: miniuart port map(
-            wb_clk_i => clock32,
+        inst_miniuart: miniuart
+        generic map (
+            MainClockSpeed => MainClockSpeed,
+            DefaultBaud => DefaultBaud
+        )
+        port map (
+            wb_clk_i => clock_main,
             wb_rst_i => reset,
             wb_adr_i => addr(1 downto 0),
             wb_dat_i => din,
@@ -1039,13 +1057,19 @@ begin
             wb_ack_o => open,
             inttx_o  => open,
             intrx_o  => open,
-            br_clk_i => clock32,
+            br_clk_i => clock_main,
             txd_pad_o => uart_TxD,
             rxd_pad_i => uart_RxD,
             esc_o     => uart_escape,
             break_o   => uart_break  
         );
 
+    end generate;
+    
+    Optional_Not_Uart: if not CImplUart generate
+      uart_TxD    <= '1';
+      uart_escape <= '1';
+      uart_break  <= '1';
     end generate;
         
 end BEHAVIORAL;
