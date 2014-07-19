@@ -499,7 +499,7 @@ begin
 
     reg_addr <= addr(4 downto 0);
     
-    reg_do <= extensions    when reg_addr = "00000" and CImplGraphicsExt else
+    reg_do <= extensions    when reg_addr = "00000" and (CImplGraphicsExt or CImplVGA80x40 or CImplHWScrolling) else
               char_addr     when reg_addr = "00001" and CImplSoftChar    else
               ocrx          when reg_addr = "00010" and CImplVGA80x40    else
               ocry          when reg_addr = "00011" and CImplVGA80x40    else
@@ -580,10 +580,11 @@ begin
     end generate;
     
     -----------------------------------------------------------------------------
-    -- Optional Graphics Modes
+    -- Graphics Extension Register
+    -- shared by several optional functions
     -----------------------------------------------------------------------------
-
-    Optional_GraphicsExt: if CImplGraphicsExt generate
+    
+    Optional_GraphicsExtReg: if CImplGraphicsExt or CImplVGA80x40 or CImplHWScrolling generate
 
         -- A register to control extra 6847 features
         process (clock_main)
@@ -601,7 +602,15 @@ begin
                 end if;
             end if;
         end process;
-      
+        
+    end generate;
+    
+    -----------------------------------------------------------------------------
+    -- Optional Graphics Modes
+    -----------------------------------------------------------------------------
+
+    Optional_GraphicsExt: if CImplGraphicsExt generate
+
         -- Adjust the inputs to the 6847 based on the extensions register
         process (extensions, doutb, css_masked, ag_masked)
         begin

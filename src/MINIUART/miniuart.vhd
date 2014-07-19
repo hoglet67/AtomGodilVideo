@@ -96,7 +96,8 @@ architecture Behaviour of MINIUART is
   signal RxData  : std_logic_vector(7 downto 0);   -- Last Byte received
   signal RxData1 : std_logic_vector(7 downto 0);
   signal TxData  : std_logic_vector(7 downto 0);   -- Last bytes transmitted
-  signal SReg    : std_logic_vector(7 downto 0);   -- Status register
+  signal SReg    : std_logic_vector(1 downto 0);   -- Status register
+  signal CReg    : std_logic_vector(7 downto 2);   -- Control register
   signal EnabRx  : std_logic;           -- Enable RX unit
   signal EnabTx  : std_logic;           -- Enable TX unit
   signal RxAv    : std_logic;           -- Data Received
@@ -120,7 +121,6 @@ begin
   IntRx_O          <= RxAv;
   SReg(0)          <= not TxBusy;
   SReg(1)          <= RxAv;
-  SReg(7 downto 2) <= "000000";
 
 
   -- 16MHz x 1M = 64ms
@@ -151,7 +151,7 @@ BREAKctrl: process(WB_CLK_I)
       if (WB_RST_I = '1') then
          BREAK_O <= '1';
          count := (others => '0');
-      elsif RxData1 /= X"1A" and RxData = X"1A" then
+      elsif RxData1 /= X"1A" and RxData = X"1A" and CReg(7) = '1' then
          BREAK_O <= '0';
          count := (others => '1');
       elsif count > 0 then
@@ -162,7 +162,7 @@ BREAKctrl: process(WB_CLK_I)
     end if;
   end process;
 
-  ESC_O          <= '0' when RxData = X"1B" else '1';
+  ESC_O <= '0' when RxData = X"1B" and CReg(6) = '1' else '1';
   
   -- Implements WishBone data exchange.
   -- Clocked on rising edge. Synchronous Reset RST_I
@@ -174,6 +174,7 @@ BREAKctrl: process(WB_CLK_I)
         ReadA <= '0';
         LoadA <= '0';
         Divisor <= std_logic_vector(to_unsigned(MainClockSpeed / 4 / DefaultBaud, 16));
+        CReg(7 downto 2) <= "000000";
       else
         if (WB_STB_I = '1' and WB_WE_I = '1' and WB_ADR_I = "00") then  -- Write Byte to Tx
           TxData <= WB_DAT_I;
@@ -183,6 +184,9 @@ BREAKctrl: process(WB_CLK_I)
         if (WB_STB_I = '1' and WB_WE_I = '0' and WB_ADR_I = "00") then  -- Read Byte from Rx
           ReadA <= '1';                 -- Read signal
         else ReadA <= '0';
+        end if;
+        if (WB_STB_I = '1' and WB_WE_I = '1' and WB_ADR_I = "01") then  -- Write Control
+          CReg <= WB_DAT_I(7 downto 2);
         end if;
         if (WB_STB_I = '1' and WB_WE_I = '1' and WB_ADR_I = "10") then  -- Write Divisor Low
           Divisor(7 downto 0) <= WB_DAT_I;
@@ -195,9 +199,9 @@ BREAKctrl: process(WB_CLK_I)
   end process;
   WB_ACK_O <= WB_STB_I;
   WB_DAT_O <=
-    RxData when WB_ADR_I = "00" else    -- Read Byte from Rx
-    SReg   when WB_ADR_I = "01" else    -- Read Status Reg
-    Divisor(7 downto 0) when WB_ADR_I = "10" else -- Read Divisor Low
+    RxData               when WB_ADR_I = "00" else -- Read Byte from Rx
+    CReg & SReg          when WB_ADR_I = "01" else -- Read Control/Status Reg
+    Divisor(7 downto 0)  when WB_ADR_I = "10" else -- Read Divisor Low
     Divisor(15 downto 8) when WB_ADR_I = "11" else -- Read Divisor Low
     "00000000";
 end Behaviour;
