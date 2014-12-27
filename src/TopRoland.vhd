@@ -67,6 +67,9 @@ entity TopRoland is
 
         -- Jumpers
         
+        -- Enabled SID Audio
+        SIDEN : in std_logic;
+
         -- Moves SID from 9FE0 to BDC0 
         nSIDD : in std_logic;
         
@@ -354,7 +357,7 @@ begin
 
     -- Signals driving the VRAM
     -- Write just before the rising edge of nWR
-    ram_we <= '1' when (nWRMS1 = '1' and nWRMS2 = '0') else '0';
+    ram_we <= '1' when (nWRMS1 = '1' and nWRMS2 = '0' and nBXXX2 = '1') else '0';
     din    <= DD3;
     addr   <= DA2;
     
@@ -392,7 +395,7 @@ begin
                         (nSIDD = '0' and nWR1 = '1' and nWR2 = '0')
                    else '0';
     
-    AUDIO <= sid_audio;
+    AUDIO <= sid_audio when SIDEN = '1' else '0';
 
     -- Output the SID Select Signal so it can be used to disable the bus buffers
     -- TODO: this looks incorrect
