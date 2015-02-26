@@ -39,6 +39,7 @@ entity AtomGodilVideo is
        CImplHWScrolling : boolean;
        CImplMouse       : boolean;
        CImplUart        : boolean;
+       CImplDoubleVideo : boolean;
        MainClockSpeed   : integer;
        DefaultBaud      : integer
     );
@@ -110,7 +111,7 @@ end AtomGodilVideo;
 architecture BEHAVIORAL of AtomGodilVideo is
 
     constant MAJOR_VERSION : std_logic_vector(3 downto 0) := "0001";
-    constant MINOR_VERSION : std_logic_vector(3 downto 0) := "0001";
+    constant MINOR_VERSION : std_logic_vector(3 downto 0) := "0010";
 
     -- Set this to 0 if you want dark green/dark orange background on text
     -- Set this to 1 if you want black background on text (authentic Atom)
@@ -205,6 +206,16 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal vga80_addrb_hw: std_logic_vector (12 downto 0);
 
     signal uart_do  : std_logic_vector (7 downto 0);
+
+
+    signal bank0_douta  : std_logic_vector (7 downto 0);
+    signal bank0_doutb  : std_logic_vector (7 downto 0);
+    signal bank0_we     : std_logic;
+    signal bank1_douta  : std_logic_vector (7 downto 0);
+    signal bank1_doutb  : std_logic_vector (7 downto 0);
+    signal bank1_we     : std_logic;
+    signal bank_sela    : std_logic;
+    signal bank_selb    : std_logic;
     
     Component vga80x40
         port(
@@ -427,23 +438,65 @@ begin
 
     mc6847_d_final <= mc6847_d_with_pointer when CImplMouse else mc6847_d;
 
-    -- 8Kx8 Dual port video RAM
-    -- Port A connects to Atom and is read/write
-    -- Port B connects to MC6847 and is read only    
-    Inst_VideoRam : VideoRam
-        port map (
-            clka  => clock_main,
-            wea   => ram_we,
-            addra => addr,
-            dina  => din,
-            douta => douta,
-            clkb  => clock_vga,
-            web   => '0',
-            addrb => addrb,
-            dinb  => (others => '0'),
-            doutb => doutb
-            );
 
+    Optional_not_DoubleVideo: if not CImplDoubleVideo generate
+        -- 8Kx8 Dual port video RAM
+        -- Port A connects to Atom and is read/write
+        -- Port B connects to MC6847 and is read only    
+        Inst_VideoRam : VideoRam
+            port map (
+                clka  => clock_main,
+                wea   => ram_we,
+                addra => addr,
+                dina  => din,
+                douta => douta,
+                clkb  => clock_vga,
+                web   => '0',
+                addrb => addrb,
+                dinb  => (others => '0'),
+                doutb => doutb
+                );
+    end generate;                
+
+    Optional_DoubleVideo: if CImplDoubleVideo generate
+        -- Double Buffered 8Kx8 Dual port video RAM
+        -- Port A connects to Atom and is read/write
+        -- Port B connects to MC6847 and is read only    
+        Inst_VideoRam0 : VideoRam
+            port map (
+                clka  => clock_main,
+                wea   => bank0_we,
+                addra => addr,
+                dina  => din,
+                douta => bank0_douta,
+                clkb  => clock_vga,
+                web   => '0',
+                addrb => addrb,
+                dinb  => (others => '0'),
+                doutb => bank0_doutb
+                );
+                
+        Inst_VideoRam1 : VideoRam
+            port map (
+                clka  => clock_main,
+                wea   => bank1_we,
+                addra => addr,
+                dina  => din,
+                douta => bank1_douta,
+                clkb  => clock_vga,
+                web   => '0',
+                addrb => addrb,
+                dinb  => (others => '0'),
+                doutb => bank1_doutb
+                );
+        bank0_we <= ram_we   when bank_sela = '0' else '0';        
+        bank1_we <= ram_we   when bank_sela = '1' else '0';        
+        douta <= bank1_douta when bank_sela = '1' else bank0_douta;        
+        doutb <= bank1_doutb when bank_selb = '1' else bank0_doutb;        
+    end generate;  
+
+    bank_sela    <= extensions(4) when CImplDoubleVideo else '0';
+    bank_selb    <= extensions(5) when CImplDoubleVideo else '0';
     hwscrollmode <= extensions(6) when CImplHWScrolling else '0';
 
     addrb <= mc6847_addrb    when vga80x40mode = '0' and hwscrollmode = '0' else
@@ -499,7 +552,7 @@ begin
 
     reg_addr <= addr(4 downto 0);
     
-    reg_do <= extensions    when reg_addr = "00000" and (CImplGraphicsExt or CImplVGA80x40 or CImplHWScrolling) else
+    reg_do <= extensions    when reg_addr = "00000" and (CImplGraphicsExt or CImplVGA80x40 or CImplHWScrolling or CImplDoubleVideo) else
               char_addr     when reg_addr = "00001" and CImplSoftChar    else
               ocrx          when reg_addr = "00010" and CImplVGA80x40    else
               ocry          when reg_addr = "00011" and CImplVGA80x40    else

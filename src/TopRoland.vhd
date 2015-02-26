@@ -184,6 +184,7 @@ architecture BEHAVIORAL of TopRoland is
            CImplHWScrolling : boolean;
            CImplMouse       : boolean;
            CImplUart        : boolean;
+           CImplDoubleVideo : boolean;
            MainClockSpeed   : integer;
            DefaultBaud      : integer
         );
@@ -294,6 +295,7 @@ begin
            CImplHWScrolling => true,
            CImplMouse       => true,
            CImplUart        => true,
+           CImplDoubleVideo => true,
            MainClockSpeed   => 32000000,
            DefaultBaud      => 115200          
         )
