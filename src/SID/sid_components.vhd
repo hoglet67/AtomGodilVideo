@@ -44,18 +44,19 @@ end pwm_sddac;
 
 architecture rtl of pwm_sddac is
   signal sig_in : unsigned(msbi_g+2 downto 0) := (others => '0');
-
+  signal dac_o_int : std_logic;
 begin
   seq: process (clk_i, reset)
   begin
     if reset = '1' then
       sig_in <= to_unsigned(2**(msbi_g+1), sig_in'length);
-      dac_o  <= '0';
+      dac_o_int  <= not dac_o_int;
     elsif rising_edge(clk_i) then
       sig_in <= sig_in + unsigned(sig_in(msbi_g+2) & sig_in(msbi_g+2) & dac_i);
-      dac_o  <= sig_in(msbi_g+2);
+      dac_o_int  <= sig_in(msbi_g+2);
     end if;
   end process seq;
+  dac_o <= dac_o_int;
 end rtl;
 
 -------------------------------------------------------------------------------

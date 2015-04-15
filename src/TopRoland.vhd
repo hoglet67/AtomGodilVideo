@@ -72,6 +72,9 @@ entity TopRoland is
 
         -- Moves SID from 9FE0 to BDC0 
         nSIDD : in std_logic;
+
+        -- charSet
+        charSet : in std_logic;
         
         -- Active low version of the SID Select Signal for disabling the external bus buffers
         -- nSIDSEL : out std_logic;
@@ -248,8 +251,10 @@ architecture BEHAVIORAL of TopRoland is
             final_green0 : out   std_logic;
             final_blue   : out   std_logic;
             final_vsync  : out   std_logic;
-            final_hsync  : out   std_logic
+            final_hsync  : out   std_logic;
     
+            -- Default CharSet
+            charSet      : in    std_logic
             );
     end component;
 
@@ -333,7 +338,8 @@ begin
             final_green0 => final_green0,
             final_blue => final_blue,
             final_vsync => final_vsync,
-            final_hsync => final_hsync
+            final_hsync => final_hsync,
+            charSet => charSet
             );
 
     

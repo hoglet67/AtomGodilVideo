@@ -103,8 +103,10 @@ entity AtomGodilVideo is
         final_green0 : out   std_logic;
         final_blue   : out   std_logic;
         final_vsync  : out   std_logic;
-        final_hsync  : out   std_logic
+        final_hsync  : out   std_logic;
 
+        -- Default CharSet
+        charSet      : in    std_logic
         );
 end AtomGodilVideo;
 
@@ -192,6 +194,7 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal lines          : std_logic_vector (7 downto 0);
 
     signal vga80x40mode  : std_logic;
+    signal int_char_a    : std_logic_vector (10 downto 0);
     signal final_char_a  : std_logic_vector (10 downto 0);
     
     signal vga80_R       : std_logic;
@@ -514,8 +517,22 @@ begin
     final_blue   <= vga_blue(7)     when vga80x40mode = '0' else vga80_B;
     final_vsync  <= vga_vsync       when vga80x40mode = '0' else vga80_vsync;
     final_hsync  <= vga_hsync       when vga80x40mode = '0' else vga80_hsync;
-    final_char_a <= mc6847_char_a   when vga80x40mode = '0' else vga80_char_a;
 
+    -- int_char_a(10 downto 4) select character 0..127
+    -- int_chat_a( 3 downto 0) select row 0..11    
+    int_char_a   <= mc6847_char_a   when vga80x40mode = '0' else vga80_char_a;
+
+    final_char_a <= int_char_a when extensions(3) = '0' or int_char_a(10) = '1' else
+                    int_char_a(9 downto 4) & "01100" when int_char_a(3 downto 0) = "0010" else
+                    int_char_a(9 downto 4) & "01101" when int_char_a(3 downto 0) = "0011" else
+                    int_char_a(9 downto 4) & "01110" when int_char_a(3 downto 0) = "0100" else
+                    int_char_a(9 downto 4) & "01111" when int_char_a(3 downto 0) = "0101" else
+                    int_char_a(9 downto 4) & "11100" when int_char_a(3 downto 0) = "0110" else
+                    int_char_a(9 downto 4) & "11101" when int_char_a(3 downto 0) = "0111" else
+                    int_char_a(9 downto 4) & "11110" when int_char_a(3 downto 0) = "1000" else
+                    int_char_a(9 downto 4) & "11111" when int_char_a(3 downto 0) = "1001" else
+                    "00000000000";
+    
     -- Hold internal reset low for two frames after nRST released
     -- This avoids any diaplay glitches
     process (clock_vga)
@@ -544,7 +561,7 @@ begin
         end if;
     end process;
         
-    -- During reset, force the 6847 mode select inputs low
+   -- During reset, force the 6847 mode select inputs low
     -- (this is necessary to stop the mode changing during reset, as the GODIL has 1.5K pullups)
     gm_masked  <= GM(2 downto 0) when mask = '1' else (others => '0');
     ag_masked  <= AG             when mask = '1' else '0';
@@ -645,6 +662,7 @@ begin
             if rising_edge(clock_main) then
                 if (reset = '1') then
                     extensions <= (others => '0');
+                    extensions(3) <= charSet;
                 elsif (reg_cs = '1' and reg_we = '1') then
                     case reg_addr is
                     -- extensions register
