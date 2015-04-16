@@ -113,7 +113,7 @@ end AtomGodilVideo;
 architecture BEHAVIORAL of AtomGodilVideo is
 
     constant MAJOR_VERSION : std_logic_vector(3 downto 0) := "0001";
-    constant MINOR_VERSION : std_logic_vector(3 downto 0) := "0010";
+    constant MINOR_VERSION : std_logic_vector(3 downto 0) := "0011";
 
     -- Set this to 0 if you want dark green/dark orange background on text
     -- Set this to 1 if you want black background on text (authentic Atom)
