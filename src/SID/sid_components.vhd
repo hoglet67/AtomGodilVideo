@@ -48,10 +48,12 @@ architecture rtl of pwm_sddac is
 begin
   seq: process (clk_i, reset)
   begin
-    if reset = '1' then
-      sig_in <= to_unsigned(2**(msbi_g+1), sig_in'length);
-      dac_o_int  <= not dac_o_int;
-    elsif rising_edge(clk_i) then
+    -- Disabling reset as the DC offset causes a noticable click 
+    -- if reset = '1' then
+    --   sig_in <= to_unsigned(2**(msbi_g+1), sig_in'length);
+    --   dac_o_int  <= not dac_o_int;
+    -- els
+    if rising_edge(clk_i) then
       sig_in <= sig_in + unsigned(sig_in(msbi_g+2) & sig_in(msbi_g+2) & dac_i);
       dac_o_int  <= sig_in(msbi_g+2);
     end if;
