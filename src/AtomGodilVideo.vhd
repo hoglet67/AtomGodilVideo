@@ -219,6 +219,14 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal bank1_we     : std_logic;
     signal bank_sela    : std_logic;
     signal bank_selb    : std_logic;
+
+function truncate(x: in std_logic_vector; constant length: in integer)
+return std_logic_vector is
+    variable result : std_logic_vector(length-1 downto 0);
+begin
+    result := x(length-1 downto 0);
+    return result;
+end function;
     
     Component vga80x40
         port(
@@ -974,9 +982,9 @@ begin
             end if;
                 
             if (x >= scroll_h_min and x < scroll_h_max) and (y >= scroll_v_min and y < scroll_v_max) then
-                x := x + scroll_h;
+                x := truncate(x + scroll_h, 6);
                 if (x >= scroll_h_max) then
-                    x := x - (scroll_h_max - scroll_h_min);
+                    x := truncate(x - (scroll_h_max - scroll_h_min), 6);
                 end if;
                 y := y + scroll_v;
                 if (y >= scroll_v_max) then
@@ -1024,14 +1032,14 @@ begin
             if (attr = '0') then
                 addr1 := vga80_addrb(11 downto 0);
             else
-                addr1 := vga80_addrb - 3200;
+                addr1 := truncate(vga80_addrb - 3200, 12);
             end if;
     
             -- calculate x from the address modulo 80
             x1 := modulo5(addr1(11 downto 4)) & addr1(3 downto 0);
     
             -- calculate the new x after the scroll_h has been added, modulo 80
-            x2 := ('0' & x1) + ('0' & scroll_h);
+            x2 := truncate(('0' & x1) + ('0' & scroll_h), 8);
             if (x2 >= 80) then
                 x2 := x2 - 80;
             end if;
@@ -1044,7 +1052,7 @@ begin
              
             -- detect wrapping in wrapping in the character and attributevregions
             if ((attr = '0' and addr2 >= 3200) or addr2  >= 6400) then
-                vga80_addrb_hw <= addr2 - 3200;
+                vga80_addrb_hw <= truncate(addr2 - 3200, 13);
             else
                 vga80_addrb_hw <= addr2(12 downto 0);
             end if;
