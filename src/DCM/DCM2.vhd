@@ -4,17 +4,17 @@ use ieee.numeric_std.all;
 library UNISIM;
 use UNISIM.Vcomponents.all;
 
-entity DCMSID1 is
+entity DCM2 is
     port (CLKIN_IN  : in  std_logic;
           RST       : in  std_logic := '0';
           CLK0_OUT  : out std_logic;
           CLK0_OUT1 : out std_logic;
           CLK2X_OUT : out std_logic;
-          LOCKED    : out std_logic
+          LOCKED    : out std_logic          
           ); 
-end DCMSID1;
+end DCM2;
 
-architecture BEHAVIORAL of DCMSID1 is
+architecture BEHAVIORAL of DCM2 is
     signal CLKFX_BUF   : std_logic;
     signal CLKIN_IBUFG : std_logic;
     signal GND_BIT     : std_logic;
@@ -27,10 +27,10 @@ begin
     DCM_INST : DCM
         generic map(CLK_FEEDBACK          => "NONE",
                     CLKDV_DIVIDE          => 4.0,
-                    CLKFX_DIVIDE          => 12,
-                    CLKFX_MULTIPLY        => 25,
+                    CLKFX_MULTIPLY        => 3,
+                    CLKFX_DIVIDE          => 7,
                     CLKIN_DIVIDE_BY_2     => false,
-                    CLKIN_PERIOD          => 65.1,
+                    CLKIN_PERIOD          => 20.344,
                     CLKOUT_PHASE_SHIFT    => "NONE",
                     DESKEW_ADJUST         => "SYSTEM_SYNCHRONOUS",
                     DFS_FREQUENCY_MODE    => "LOW",

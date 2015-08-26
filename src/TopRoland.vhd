@@ -85,8 +85,10 @@ entity TopRoland is
 
         -- UART
         uart_TxD : out std_logic;
-        uart_RxD : in  std_logic
+        uart_RxD : in  std_logic;
         
+        -- LEDs
+        led8     : out std_logic        
         );
 end TopRoland;
 
@@ -100,6 +102,9 @@ architecture BEHAVIORAL of TopRoland is
     
     -- clock15 is just used between two DCMs
     signal clock15 : std_logic;
+
+    -- clock59 is just used between two DCMs
+    signal clock59 : std_logic;
     
     -- Reset signal (active high)
     signal reset : std_logic;
@@ -151,147 +156,60 @@ architecture BEHAVIORAL of TopRoland is
     signal final_hsync   : std_logic;
     signal final_char_a  : std_logic_vector (10 downto 0);
     
-    component DCM0
-        port(
-            CLKIN_IN  : in  std_logic;
-            CLK0_OUT  : out std_logic;
-            CLK0_OUT1 : out std_logic;
-            CLK2X_OUT : out std_logic
-            );
-    end component;
-
-    component DCMSID0
-        port(
-            CLKIN_IN  : in  std_logic;
-            CLK0_OUT  : out std_logic;
-            CLK0_OUT1 : out std_logic;
-            CLK2X_OUT : out std_logic
-            );
-    end component;
-
-    component DCMSID1
-        port(
-            CLKIN_IN  : in  std_logic;
-            CLK0_OUT  : out std_logic;
-            CLK0_OUT1 : out std_logic;
-            CLK2X_OUT : out std_logic
-            );
-    end component;
-
-    component AtomGodilVideo
-        generic (
-           CImplGraphicsExt : boolean;
-           CImplSoftChar    : boolean;
-           CImplSID         : boolean;
-           CImplVGA80x40    : boolean;
-           CImplHWScrolling : boolean;
-           CImplMouse       : boolean;
-           CImplUart        : boolean;
-           CImplDoubleVideo : boolean;
-           MainClockSpeed   : integer;
-           DefaultBaud      : integer
-        );
-        port (
-            -- clock_vga is a full speed VGA clock (25MHz ish)      
-            clock_vga      : in    std_logic;
+    signal locked1       : std_logic;
+    signal locked2       : std_logic;
+    signal locked3       : std_logic;
+    signal locked4       : std_logic;
     
-            -- clock_main is the main clock    
-            clock_main      : in    std_logic;
-        
-            -- A fixed 32MHz clock for the SID
-            clock_sid_32MHz  : in    std_logic;
-    
-            -- As fast a clock as possible for the SID DAC
-            clock_sid_dac  : in    std_logic;
-    
-            -- Reset signal (active high)
-            reset        : in    std_logic;
-    
-            -- Reset signal to 6847 (active high), not currently used
-            reset_vid    : in    std_logic;
-            
-            -- Main Address / Data Bus
-            din          : in    std_logic_vector (7 downto 0);
-            dout         : out   std_logic_vector (7 downto 0);
-            addr         : in    std_logic_vector (12 downto 0);
-    
-            -- 6847 Control Signals
-            CSS          : in    std_logic;
-            AG           : in    std_logic;
-            GM           : in    std_logic_vector (2 downto 0);
-            nFS          : out   std_logic;
-    
-            -- RAM signals
-            ram_we       : in    std_logic;
-    
-            -- SID signals
-            reg_cs       : in    std_logic;
-            reg_we       : in    std_logic;
-    
-            -- SID signals
-            sid_cs       : in    std_logic;
-            sid_we       : in    std_logic;
-            sid_audio    : out   std_logic;
-            
-            -- PS/2 Mouse
-            PS2_CLK      : inout std_logic;
-            PS2_DATA     : inout std_logic;
-
-            -- UART signals
-            uart_cs      : in    std_logic;
-            uart_we      : in    std_logic;
-            uart_RxD     : in    std_logic;
-            uart_TxD     : out   std_logic;     
-            uart_escape  : out   std_logic;
-            uart_break   : out   std_logic;  
-            
-            -- VGA Signals
-            final_red    : out   std_logic;
-            final_green1 : out   std_logic;
-            final_green0 : out   std_logic;
-            final_blue   : out   std_logic;
-            final_vsync  : out   std_logic;
-            final_hsync  : out   std_logic;
-    
-            -- Default CharSet
-            charSet      : in    std_logic
-            );
-    end component;
-
-
 begin
 
     reset <= not nRST;
     reset_vid <= '0';
-
-    -- Currently set at 49.152 * 8 / 31 = 12.684MHz
-    -- half VGA should be 25.175 / 2 = 12. 5875
-    -- we could get closer with to cascaded multipliers
-    Inst_DCM0 : DCM0
+            
+    -- Currently set at 49.152 * (31/26) * (3/7) = 25.1161318637MHz
+    Inst_DCM1 : entity work.DCM1
         port map (
             CLKIN_IN  => clock49,
+            RST       => '0',
+            CLK0_OUT  => clock59,
+            CLK0_OUT1 => open,
+            CLK2X_OUT => open,
+            LOCKED    => locked1
+            );
+
+    Inst_DCM2 : entity work.DCM2
+        port map (
+            CLKIN_IN  => clock59,
+            RST       => not locked1,
             CLK0_OUT  => clock25,
             CLK0_OUT1 => open,
-            CLK2X_OUT => open
+            CLK2X_OUT => open,
+            LOCKED    => locked2
             );
 
-    Inst_DCMSID0 : DCMSID0
+    Inst_DCM3 : entity work.DCMSID0
         port map (
             CLKIN_IN  => clock49,
+            RST       => '0',
             CLK0_OUT  => clock15,
             CLK0_OUT1 => open,
-            CLK2X_OUT => open
+            CLK2X_OUT => open,
+            LOCKED    => locked3
             );
             
-    Inst_DCMSID1 : DCMSID1
+    Inst_DCM4 : entity work.DCMSID1
         port map (
             CLKIN_IN  => clock15,
+            RST       => not locked3,
             CLK0_OUT  => clock32,
             CLK0_OUT1 => open,
-            CLK2X_OUT => open
+            CLK2X_OUT => open,
+            LOCKED    => locked4
             );
             
-    Inst_AtomGodilVideo : AtomGodilVideo
+    led8 <= not (locked1 and locked2 and locked3 and locked4);
+            
+    Inst_AtomGodilVideo : entity work.AtomGodilVideo
         generic map (
            CImplGraphicsExt => true,
            CImplSoftChar    => true,

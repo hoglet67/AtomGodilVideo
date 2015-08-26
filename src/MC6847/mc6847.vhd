@@ -67,8 +67,6 @@ architecture SYN of mc6847 is
 -- constant H_RIGHT_BORDER     : integer := H_VIDEO + 54;---3;      -- tweak to get to 60hz exactly
 -- constant H_TOTAL_PER_LINE   : integer := H_RIGHT_BORDER;
 
-
-    -- 12.5714 MHz = 32 * 11 / 28
     constant H_FRONT_PORCH    : integer := 8;
     constant H_HORIZ_SYNC     : integer := H_FRONT_PORCH + 48;
     constant H_BACK_PORCH     : integer := H_HORIZ_SYNC + 24;
@@ -81,7 +79,7 @@ architecture SYN of mc6847 is
     constant V2_FRONT_PORCH     : integer := 2;
     constant V2_VERTICAL_SYNC   : integer := V2_FRONT_PORCH + 2;
     constant V2_BACK_PORCH      : integer := V2_VERTICAL_SYNC + 12;
-    constant V2_TOP_BORDER      : integer := V2_BACK_PORCH + 27;  -- + 25;  -- +25 for PAL
+    constant V2_TOP_BORDER      : integer := V2_BACK_PORCH + 26;  -- + 25;  -- +25 for PAL
     constant V2_VIDEO           : integer := V2_TOP_BORDER + 192;
     constant V2_BOTTOM_BORDER   : integer := V2_VIDEO + 27;  -- + 25;       -- +25 for PAL
     constant V2_TOTAL_PER_FIELD : integer := V2_BOTTOM_BORDER;
@@ -124,7 +122,7 @@ architecture SYN of mc6847 is
     signal cvbs_char_d_o  : std_logic_vector(7 downto 0);  -- CVBS char_d_o out
 
     alias hs_int   : std_logic is cvbs_hblank;
-    alias fs_int   : std_logic is cvbs_vblank;
+    signal fs_int  : std_logic;
     signal da0_int : std_logic_vector(4 downto 0);
 
     -- character rom signals
@@ -319,6 +317,7 @@ begin
                     cvbs_vsync <= '0';
                 elsif v_count = V2_VERTICAL_SYNC then
                     cvbs_vsync <= '1';
+                    fs_int <= '0';
                 elsif v_count = V2_BACK_PORCH then
                     cvbs_vborder <= '1';
                 elsif v_count = V2_TOP_BORDER then
@@ -329,6 +328,7 @@ begin
                     tripletcnt     <= (others => '0');
                 elsif v_count = V2_VIDEO then
                     cvbs_vblank <= '1';
+                    fs_int <= '1';
                 elsif v_count = V2_BOTTOM_BORDER then
                     cvbs_vborder <= '0';
                 else

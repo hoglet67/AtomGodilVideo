@@ -6,9 +6,12 @@ use UNISIM.Vcomponents.all;
 
 entity DCMSID0 is
     port (CLKIN_IN  : in  std_logic;
+          RST       : in  std_logic := '0';
           CLK0_OUT  : out std_logic;
           CLK0_OUT1 : out std_logic;
-          CLK2X_OUT : out std_logic); 
+          CLK2X_OUT : out std_logic;
+          LOCKED    : out std_logic
+          ); 
 end DCMSID0;
 
 architecture BEHAVIORAL of DCMSID0 is
@@ -42,7 +45,7 @@ begin
                   PSCLK    => GND_BIT,
                   PSEN     => GND_BIT,
                   PSINCDEC => GND_BIT,
-                  RST      => GND_BIT,
+                  RST      => RST,
                   CLKDV    => open,
                   CLKFX    => CLKFX_BUF,
                   CLKFX180 => open,
@@ -52,7 +55,7 @@ begin
                   CLK90    => open,
                   CLK180   => open,
                   CLK270   => open,
-                  LOCKED   => open,
+                  LOCKED   => LOCKED,
                   PSDONE   => open,
                   STATUS   => open);
 

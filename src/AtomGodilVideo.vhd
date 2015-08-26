@@ -113,7 +113,7 @@ end AtomGodilVideo;
 architecture BEHAVIORAL of AtomGodilVideo is
 
     constant MAJOR_VERSION : std_logic_vector(3 downto 0) := "0001";
-    constant MINOR_VERSION : std_logic_vector(3 downto 0) := "0011";
+    constant MINOR_VERSION : std_logic_vector(3 downto 0) := "0100";
 
     -- Set this to 0 if you want dark green/dark orange background on text
     -- Set this to 1 if you want black background on text (authentic Atom)
@@ -219,159 +219,18 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal bank1_we     : std_logic;
     signal bank_sela    : std_logic;
     signal bank_selb    : std_logic;
-
-function truncate(x: in std_logic_vector; constant length: in integer)
-return std_logic_vector is
-    variable result : std_logic_vector(length-1 downto 0);
-begin
-    result := x(length-1 downto 0);
-    return result;
-end function;
     
-    Component vga80x40
-        port(
-            reset : IN std_logic;
-            clk25MHz : IN std_logic;
-            TEXT_D : IN std_logic_vector(7 downto 0);
-            FONT_D : IN std_logic_vector(7 downto 0);
-            ocrx : IN std_logic_vector(7 downto 0);
-            ocry : IN std_logic_vector(7 downto 0);
-            octl : IN std_logic_vector(7 downto 0);          
-            octl2 : IN std_logic_vector(7 downto 0);          
-            TEXT_A : OUT std_logic_vector(12 downto 0);
-            FONT_A : OUT std_logic_vector(11 downto 0);
-            R : OUT std_logic;
-            G : OUT std_logic;
-            B : OUT std_logic;
-            hsync : OUT std_logic;
-            vsync : OUT std_logic
-            );
-    end component;
+    signal fs_n         : std_logic;
+    signal hs_n         : std_logic;
 
-    component mc6847
-        port(
-            clk            : in  std_logic;
-            clk_ena        : in  std_logic;
-            reset          : in  std_logic;
-            dd             : in  std_logic_vector(7 downto 0);
-            an_g           : in  std_logic;
-            an_s           : in  std_logic;
-            intn_ext       : in  std_logic;
-            gm             : in  std_logic_vector(2 downto 0);
-            css            : in  std_logic;
-            inv            : in  std_logic;
-            artifact_en    : in  std_logic;
-            artifact_set   : in  std_logic;
-            artifact_phase : in  std_logic;
-            da0            : out std_logic;
-            videoaddr      : out std_logic_vector(12 downto 0);
-            hs_n           : out std_logic;
-            fs_n           : out std_logic;
-            red            : out std_logic_vector(7 downto 0);
-            green          : out std_logic_vector(7 downto 0);
-            blue           : out std_logic_vector(7 downto 0);
-            hsync          : out std_logic;
-            vsync          : out std_logic;
-            hblank         : out std_logic;
-            vblank         : out std_logic;
-            cvbs           : out std_logic_vector(7 downto 0);
-            black_backgnd  : in  std_logic;
-            char_a         : out std_logic_vector(10 downto 0);
-            char_d_o       : in std_logic_vector(7 downto 0)
-            );
-    end component;
-
-    component VideoRam
-        port (
-            clka  : in  std_logic;
-            wea   : in  std_logic;
-            addra : in  std_logic_vector(12 downto 0);
-            dina  : in  std_logic_vector(7 downto 0);
-            douta : out std_logic_vector(7 downto 0);
-            clkb  : in  std_logic;
-            web   : in  std_logic;
-            addrb : in  std_logic_vector(12 downto 0);
-            dinb  : in  std_logic_vector(7 downto 0);
-            doutb : out std_logic_vector(7 downto 0)
-            );
-    end component;
-
-    component sid6581
-        port(
-            clk_1MHz : in std_logic;
-            clk32 : in std_logic;
-            clk_DAC : in std_logic;
-            reset : in std_logic;
-            cs : in std_logic;
-            we : in std_logic;
-            addr : in std_logic_vector(4 downto 0);
-            di : in std_logic_vector(7 downto 0);    
-            pot_x : in std_logic;
-            pot_y : in std_logic;      
-            do : out std_logic_vector(7 downto 0);
-            audio_out : out std_logic;
-            audio_data : out std_logic_vector(17 downto 0)
-            );
-    end component;
-    
-    component MouseRefComp
-        generic (
-           MainClockSpeed   : integer
-        );
-        port(
-            CLK : IN std_logic;
-            RESOLUTION : IN std_logic;
-            RST : IN std_logic;
-            SWITCH : IN std_logic;    
-            PS2_CLK : INOUT std_logic;
-            PS2_DATA : INOUT std_logic;      
-            LEFT : OUT std_logic;
-            MIDDLE : OUT std_logic;
-            NEW_EVENT : OUT std_logic;
-            RIGHT : OUT std_logic;
-            XPOS : OUT std_logic_vector(9 downto 0);
-            YPOS : OUT std_logic_vector(9 downto 0);
-            ZPOS : OUT std_logic_vector(3 downto 0)
-            );
-    end component;
-
-    component Pointer is
-        port (
-            CLK  : in  std_logic;
-            PO   : in  std_logic;
-            PS   : in  std_logic_vector (4 downto 0);
-            X    : in  std_logic_vector (7 downto 0);
-            Y    : in  std_logic_vector (7 downto 0);
-            ADDR : in  std_logic_vector (12 downto 0);
-            DIN  : in  std_logic_vector (7 downto 0);
-            DOUT : out std_logic_vector (7 downto 0)
-            );
-    end component;
-
-    component miniuart
-        generic (
-            MainClockSpeed : integer;
-            DefaultBaud : integer
-        );
-        port(
-            wb_clk_i : in std_logic;
-            wb_rst_i : in std_logic;
-            wb_adr_i : in std_logic_vector(1 downto 0);
-            wb_dat_i : in std_logic_vector(7 downto 0);
-            wb_we_i : in std_logic;
-            wb_stb_i : in std_logic;
-            br_clk_i : in std_logic;
-            rxd_pad_i : in std_logic;          
-            wb_dat_o : out std_logic_vector(7 downto 0);
-            wb_ack_o : out std_logic;
-            inttx_o : out std_logic;
-            intrx_o : out std_logic;
-            txd_pad_o : out std_logic;
-            esc_o : out std_logic;
-            break_o : out std_logic
-        );
-    end component;
-    
+    function truncate(x: in std_logic_vector; constant length: in integer)
+    return std_logic_vector is
+        variable result : std_logic_vector(length-1 downto 0);
+    begin
+        result := x(length-1 downto 0);
+        return result;
+    end function;
+      
     function modulo5 (x : std_logic_vector(7 downto 0))
         return std_logic_vector is
 
@@ -415,7 +274,7 @@ begin
     -- Original version: https://svn.pacedev.net/repos/pace/sw/src/component/video/mc6847.vhd
     -- Updated by AlanD for his Atom FPGA: http://stardot.org.uk/forums/viewtopic.php?f=3&t=6313
     -- A further few bugs fixed by myself
-    Inst_mc6847 : mc6847
+    Inst_mc6847 : entity work.mc6847
         port map (
             clk            => clock_vga,
             clk_ena        => clock_vga_en,
@@ -423,8 +282,8 @@ begin
             da0            => open,
             videoaddr      => mc6847_addrb,
             dd             => mc6847_d_final,
-            hs_n           => open,
-            fs_n           => nFS,
+            hs_n           => hs_n,
+            fs_n           => fs_n,
             an_g           => ag_masked,
             an_s           => mc6847_an_s,
             intn_ext       => mc6847_intn_ext,
@@ -447,6 +306,8 @@ begin
             char_d_o       => char_d_o
             );
 
+    nFS <= fs_n;
+    
     mc6847_d_final <= mc6847_d_with_pointer when CImplMouse else mc6847_d;
 
 
@@ -454,7 +315,7 @@ begin
         -- 8Kx8 Dual port video RAM
         -- Port A connects to Atom and is read/write
         -- Port B connects to MC6847 and is read only    
-        Inst_VideoRam : VideoRam
+        Inst_VideoRam : entity work.VideoRam
             port map (
                 clka  => clock_main,
                 wea   => ram_we,
@@ -473,7 +334,7 @@ begin
         -- Double Buffered 8Kx8 Dual port video RAM
         -- Port A connects to Atom and is read/write
         -- Port B connects to MC6847 and is read only    
-        Inst_VideoRam0 : VideoRam
+        Inst_VideoRam0 : entity work.VideoRam
             port map (
                 clka  => clock_main,
                 wea   => bank0_we,
@@ -487,7 +348,7 @@ begin
                 doutb => bank0_doutb
                 );
                 
-        Inst_VideoRam1 : VideoRam
+        Inst_VideoRam1 : entity work.VideoRam
             port map (
                 clka  => clock_main,
                 wea   => bank1_we,
@@ -566,14 +427,23 @@ begin
     begin
         if rising_edge(clock_vga) then
             clock_vga_en <= not clock_vga_en;
+            -- Sample the mode inputs only during the active part of the display
+            if (hs_n = '0' and fs_n = '1') then
+                -- During reset, force the 6847 mode select inputs low
+                -- (this is necessary to stop the mode changing during reset, as the GODIL has 1.5K pullups)
+                if (mask = '1') then
+                    gm_masked  <= GM(2 downto 0);
+                    ag_masked  <= AG;
+                    css_masked <= CSS;
+                else
+                    gm_masked  <= (others => '0');
+                    ag_masked  <= '0';
+                    css_masked <= '0';
+                end if;
+            end if;
         end if;
     end process;
         
-   -- During reset, force the 6847 mode select inputs low
-    -- (this is necessary to stop the mode changing during reset, as the GODIL has 1.5K pullups)
-    gm_masked  <= GM(2 downto 0) when mask = '1' else (others => '0');
-    ag_masked  <= AG             when mask = '1' else '0';
-    css_masked <= CSS            when mask = '1' else '0';
 
     reg_addr <= addr(4 downto 0);
     
@@ -821,7 +691,7 @@ begin
 
     Optional_SID: if CImplSID generate
 
-        Inst_sid6581: sid6581
+        Inst_sid6581: entity work.sid6581
             port map (
                 clk_1MHz => clock_sid_1MHz,
                 clk32 => clock_sid_32MHz,
@@ -882,7 +752,7 @@ begin
             end if;
         end process;
       
-        Inst_vga80x40: vga80x40 PORT MAP(
+        Inst_vga80x40: entity work.vga80x40 PORT MAP(
             reset => reset_vid,
             clk25MHz => clock_vga,
             TEXT_A => vga80_addrb,
@@ -1066,7 +936,7 @@ begin
 
     Optional_Mouse: if CImplMouse generate
 
-        Inst_Pointer: Pointer PORT MAP (
+        Inst_Pointer: entity work.Pointer PORT MAP (
             CLK => clock_vga,
             PO => not pointer_nr(7),
             PS => pointer_nr(4 downto 0),
@@ -1077,7 +947,7 @@ begin
             DOUT => mc6847_d_with_pointer
         );
         
-        Inst_MouseRefComp: MouseRefComp
+        Inst_MouseRefComp: entity work.MouseRefComp
         generic map (
             MainClockSpeed => MainClockSpeed
         )        
@@ -1129,7 +999,7 @@ begin
 
     Optional_Uart: if CImplUart generate
       
-        inst_miniuart: miniuart
+        inst_miniuart: entity work.miniuart
         generic map (
             MainClockSpeed => MainClockSpeed,
             DefaultBaud => DefaultBaud
