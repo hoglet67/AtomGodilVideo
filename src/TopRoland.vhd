@@ -284,7 +284,7 @@ begin
     -- Signals driving the VRAM
     -- Write just before the rising edge of nWR
     ram_we <= '1' when (nWRMS1 = '1' and nWRMS2 = '0' and nBXXX2 = '1') else '0';
-    din    <= DD3;
+    din    <= DD2;
     addr   <= DA2;
     
     -- Signals driving the internal registers
