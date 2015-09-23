@@ -281,7 +281,8 @@ begin
         variable cvbs_hblank_r  : std_logic := '0';
         --variable row_v : std_logic_vector(3 downto 0);
         -- for debug only
-        variable active_v_count : std_logic_vector(v_count'range);
+        variable videoaddr_base : std_logic_vector(12 downto 0);
+        
     begin
         if reset = '1' then
 
@@ -323,7 +324,7 @@ begin
                 elsif v_count = V2_TOP_BORDER then
                     cvbs_vblank    <= '0';
                     row_v          := (others => '0');
-                    active_v_count := (others => '0');
+                    videoaddr_base := (others => '0');
                     tripletaddr    <= (others => '0');
                     tripletcnt     <= (others => '0');
                 elsif v_count = V2_VIDEO then
@@ -332,23 +333,46 @@ begin
                 elsif v_count = V2_BOTTOM_BORDER then
                     cvbs_vborder <= '0';
                 else
-                    if row_v = 11 then
-                        row_v := (others => '0');
-                        if an_g_s = '0' then
-                            active_v_count := active_v_count + 5;  -- step for alphas
-                        else
-                            active_v_count := active_v_count + 1;  -- mode 4,4a
+                    if an_g_s = '0' then
+                        if (row_v = 11) then
+                            videoaddr_base := videoaddr_base + 32;
                         end if;
                     else
-                        row_v          := row_v + 1;
-                        active_v_count := active_v_count + 1;
+                        case gm is
+                            when "000" | "001" =>
+                                if (tripletcnt = 2) then
+                                    videoaddr_base := videoaddr_base + 16;
+                                end if;
+                            when "010" =>
+                                if (tripletcnt = 2) then
+                                    videoaddr_base := videoaddr_base + 32;
+                                end if;
+                            when "011" =>
+                                if (row_v(0) = '1') then
+                                    videoaddr_base := videoaddr_base + 16;
+                                end if;
+                            when "100" =>
+                                if (row_v(0) = '1') then
+                                    videoaddr_base := videoaddr_base + 32;
+                                end if;                            
+                            when "101" =>
+                                    videoaddr_base := videoaddr_base + 16; 
+                            when "110" | "111" =>
+                                    videoaddr_base := videoaddr_base + 32; 
+                            when others =>
+                                null;
+                        end case;
                     end if;
-
                     if tripletcnt = 2 then  -- mode 1,1a,2a
                         tripletcnt  <= (others => '0');
                         tripletaddr <= tripletaddr + 1;
                     else
                         tripletcnt <= tripletcnt + 1;
+                    end if;
+                    if row_v = 11 then
+                        row_v := (others => '0');
+                    else
+                        row_v := row_v + 1;
                     end if;
                 end if;
             else
@@ -398,33 +422,15 @@ begin
 
             if an_g_s = '0' then
                 lookup(4 downto 0) <= active_h_count(7 downto 3) + 1;
-                videoaddr          <= "000" & active_v_count(8 downto 4) & lookup(4 downto 0);
+                videoaddr          <= videoaddr_base(12 downto 5) & lookup(4 downto 0);
             else
                 case gm is              --lookupaddr
-                    when "000" =>
+                    when "000" | "001" | "011" | "101" =>
                         lookup(3 downto 0) <= active_h_count(7 downto 4) + 1;
-                        videoaddr          <= "0" & tripletaddr(7 downto 0) & lookup(3 downto 0);
-                    when "001" =>
-                        lookup(3 downto 0) <= active_h_count(7 downto 4) + 1;
-                        videoaddr          <= "0" & tripletaddr(7 downto 0) & lookup(3 downto 0);
-                    when "010" =>
+                        videoaddr          <= videoaddr_base(12 downto 4) & lookup(3 downto 0);
+                    when "010" | "100" | "110" | "111" =>
                         lookup(4 downto 0) <= active_h_count(7 downto 3) + 1;
-                        videoaddr          <= tripletaddr(7 downto 0) & lookup(4 downto 0);
-                    when "011" =>
-                        lookup(3 downto 0) <= active_h_count(7 downto 4) + 1;
-                        videoaddr          <= "00" &active_v_count(7 downto 1) & lookup(3 downto 0);
-                    when "100" =>
-                        lookup(4 downto 0) <= active_h_count(7 downto 3) + 1;
-                        videoaddr          <= "0" & active_v_count(7 downto 1) & lookup(4 downto 0);
-                    when "101" =>
-                        lookup(3 downto 0) <= active_h_count(7 downto 4) + 1;
-                        videoaddr          <= "0" &active_v_count(7 downto 0) & lookup(3 downto 0);
-                    when "110" =>
-                        lookup(4 downto 0) <= active_h_count(7 downto 3) + 1;
-                        videoaddr          <= active_v_count(7 downto 0) & lookup(4 downto 0);
-                    when "111" =>
-                        lookup(4 downto 0) <= active_h_count(7 downto 3) + 1;
-                        videoaddr          <= active_v_count(7 downto 0) & lookup(4 downto 0);
+                        videoaddr          <= videoaddr_base(12 downto 5) & lookup(4 downto 0);
                     when others =>
                         null;
                 end case;

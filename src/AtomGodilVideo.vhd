@@ -222,6 +222,7 @@ architecture BEHAVIORAL of AtomGodilVideo is
     
     signal fs_n         : std_logic;
     signal hs_n         : std_logic;
+    signal hs_n1        : std_logic;
 
     function truncate(x: in std_logic_vector; constant length: in integer)
     return std_logic_vector is
@@ -427,8 +428,9 @@ begin
     begin
         if rising_edge(clock_vga) then
             clock_vga_en <= not clock_vga_en;
+            hs_n1 <= hs_n;
             -- Sample the mode inputs only during the active part of the display
-            if (hs_n = '0' and fs_n = '1') then
+            if (hs_n = '0' and hs_n1 = '1' and fs_n = '1') then
                 -- During reset, force the 6847 mode select inputs low
                 -- (this is necessary to stop the mode changing during reset, as the GODIL has 1.5K pullups)
                 if (mask = '1') then

@@ -13,8 +13,10 @@ public class DCMCalc {
 		// double clockFreq = Double.parseDouble(args[0]);
 		// double desiredFreq = Double.parseDouble(args[1]);
 
-		double clockFreq = 49152000;
-		double desiredFreq = 1600.0 * 39375000.0 / 11.0 / 228;
+		// double clockFreq = 49152000;
+		// double desiredFreq = 1600.0 * 39375000.0 / 11.0 / 228;
+		double clockFreq = 32000000;
+		double desiredFreq = 50 * 1056 * 628;
 		System.out.println("ClockFreq: " + clockFreq);
 		System.out.println("DesiredFreq: " + desiredFreq);
 		double bestError = Double.MAX_VALUE;
@@ -26,7 +28,7 @@ public class DCMCalc {
 						for (int dcm2D = 1; dcm2D < 32; dcm2D++) {
 							double freq = clockFreq * dcm1M * dcm2M / (double) dcm1D / (double) dcm2D / (double) externalDivider;
 							double error = (freq - desiredFreq) / desiredFreq;
-							if (error <= 0 & Math.abs(error) <= Math.abs(bestError)) {
+							if (Math.abs(error) <= Math.abs(bestError)) {
 								bestError = error;
 								System.out.println("Freq: " + freq + "; Error: " + 1000000.0 * error + "ppm; (" + dcm1M + "/"
 										+ dcm1D + ") * (" + dcm2M + "/" + dcm2D + ") / " + externalDivider);
