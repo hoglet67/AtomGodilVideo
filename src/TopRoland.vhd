@@ -88,7 +88,10 @@ entity TopRoland is
         uart_RxD : in  std_logic;
         
         -- LEDs
-        led8     : out std_logic        
+        led8     : out std_logic;
+
+        -- MISC
+        CSO_B    : out std_logic
         );
 end TopRoland;
 
@@ -337,6 +340,8 @@ begin
     B(0)  <= final_blue;
     VSYNC <= final_vsync;
     HSYNC <= final_hsync;
+    
+    CSO_B <= '1';
     
         
 end BEHAVIORAL;

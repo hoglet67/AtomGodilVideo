@@ -54,6 +54,7 @@ NET "charSet" LOC="P63" | IOSTANDARD = LVCMOS33 ;
 
 NET "led8"       LOC="P47" | IOSTANDARD = LVCMOS33 ; # Green LED (near SW1)
 
+NET "CSO_B"       LOC="P24" | IOSTANDARD = LVCMOS33 ; # SPI FLASH Chip Select
  
    
 
