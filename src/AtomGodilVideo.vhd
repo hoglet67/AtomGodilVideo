@@ -224,6 +224,16 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal hs_n         : std_logic;
     signal hs_n1        : std_logic;
 
+    signal CSS1         : std_logic;
+    signal CSS2         : std_logic;
+    signal CSS3         : std_logic;
+    signal AG1          : std_logic;
+    signal AG2          : std_logic;
+    signal AG3          : std_logic;
+    signal GM1          : std_logic_vector (2 downto 0);
+    signal GM2          : std_logic_vector (2 downto 0);
+    signal GM3          : std_logic_vector (2 downto 0);
+    
     function truncate(x: in std_logic_vector; constant length: in integer)
     return std_logic_vector is
         variable result : std_logic_vector(length-1 downto 0);
@@ -427,6 +437,17 @@ begin
     process (clock_vga)
     begin
         if rising_edge(clock_vga) then
+            -- Sample the mode inputs, so we can later use a majority vote system
+            -- This is necessary to make these imputs more robust to noise
+            CSS1 <= CSS;
+            CSS2 <= CSS1;
+            CSS3 <= CSS2;
+            AG1 <= AG;
+            AG2 <= AG1;
+            AG3 <= AG2;
+            GM1 <= GM;
+            GM2 <= GM1;
+            GM3 <= GM2;
             clock_vga_en <= not clock_vga_en;
             hs_n1 <= hs_n;
             -- Sample the mode inputs only during the active part of the display
@@ -434,9 +455,11 @@ begin
                 -- During reset, force the 6847 mode select inputs low
                 -- (this is necessary to stop the mode changing during reset, as the GODIL has 1.5K pullups)
                 if (mask = '1') then
-                    gm_masked  <= GM(2 downto 0);
-                    ag_masked  <= AG;
-                    css_masked <= CSS;
+                    gm_masked(0)  <= (GM1(0) and GM2(0)) or (GM2(0) and GM3(0)) or (GM1(0) and GM3(0));
+                    gm_masked(1)  <= (GM1(1) and GM2(1)) or (GM2(1) and GM3(1)) or (GM1(1) and GM3(1));
+                    gm_masked(2)  <= (GM1(2) and GM2(2)) or (GM2(2) and GM3(2)) or (GM1(2) and GM3(2));
+                    ag_masked  <= (AG1 and AG2) or (AG2 and AG3) or (AG1 and AG3);
+                    css_masked <= (CSS1 and CSS2) or (CSS2 and CSS3) or (CSS1 and CSS3);
                 else
                     gm_masked  <= (others => '0');
                     ag_masked  <= '0';
