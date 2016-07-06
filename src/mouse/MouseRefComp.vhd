@@ -25,8 +25,8 @@
 library ieee;
 use ieee.std_logic_1164.ALL;
 use ieee.numeric_std.ALL;
-library UNISIM;
-use UNISIM.Vcomponents.ALL;
+--library UNISIM;
+--use UNISIM.Vcomponents.ALL;
 
 entity MouseRefComp is
         generic (

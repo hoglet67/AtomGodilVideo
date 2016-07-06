@@ -84,6 +84,7 @@ entity AtomGodilVideo is
         sid_cs       : in    std_logic;
         sid_we       : in    std_logic;
         sid_audio    : out   std_logic;
+        sid_audio_d  : out   std_logic_vector(17 downto 0);
         
         -- PS/2 Mouse signals
         PS2_CLK      : inout std_logic;
@@ -730,7 +731,7 @@ begin
                 pot_x => '0',
                 pot_y => '0',
                 audio_out => sid_audio,
-                audio_data => open 
+                audio_data => sid_audio_d 
             );
 
         -- Clock_Sid_1MHz is derived by dividing down thw 32MHz clock

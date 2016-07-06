@@ -246,6 +246,7 @@ begin
             sid_cs => sid_cs,
             sid_we => sid_we,
             sid_audio => sid_audio,
+            sid_audio_d => open,
             PS2_CLK => PS2_CLK,
             PS2_DATA => PS2_DATA,
             uart_cs => uart_cs,
