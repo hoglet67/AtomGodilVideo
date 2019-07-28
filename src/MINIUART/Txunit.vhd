@@ -34,13 +34,15 @@ use ieee.std_logic_1164.all;
 
 entity TxUnit is
   port (
-     Clk    : in  std_logic;  -- Clock signal
-     Reset  : in  std_logic;  -- Reset input
-     Enable : in  std_logic;  -- Enable input
-     LoadA  : in  std_logic;  -- Asynchronous Load
-     TxD    : out std_logic;  -- RS-232 data output
-     Busy   : out std_logic;  -- Tx Busy
-     DataI  : in  std_logic_vector(7 downto 0)); -- Byte to transmit
+     Clk       : in  std_logic;  -- Clock signal
+     Reset     : in  std_logic;  -- Reset input
+     Enable    : in  std_logic;  -- Enable input
+     LoadA     : in  std_logic;  -- Asynchronous Load
+     TxD       : out std_logic;  -- RS-232 data output
+     Busy      : out std_logic;  -- Tx Busy
+     DataI     : in  std_logic_vector(7 downto 0); -- Byte to transmit
+     IntTxFlag : out std_logic;  -- Tx Interrupt flag
+     IntTxEn   : in  std_logic); -- Tx Interrupt enable
 end TxUnit;
 
 architecture Behaviour of TxUnit is
@@ -93,6 +95,10 @@ begin
            end case;
            if BitPos = 10 then -- bit8. next is stop bit
               BitPos := 0;
+              -- Set the Tx interrupt flag when Tx interrupt is enabled
+              if IntTxEn = '1' then
+                 IntTxFlag <= '1';
+              end if;
            end if;
         end if;
      end if;

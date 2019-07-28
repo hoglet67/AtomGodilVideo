@@ -111,7 +111,7 @@ end Counter;
 
 architecture Behaviour of Counter is
 begin
-  counter : process(Clk,Reset)
+  counter : process(Clk,Reset,Count)
      variable Cnt : unsigned (15 downto 0);
   begin
      if Reset = '1' then

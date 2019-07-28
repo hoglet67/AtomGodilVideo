@@ -73,40 +73,50 @@ architecture Behaviour of MINIUART is
 
   component RxUnit
     port (
-      Clk    : in  std_logic;                      -- system clock signal
-      Reset  : in  std_logic;                      -- Reset input
-      Enable : in  std_logic;                      -- Enable input
-      ReadA  : in  std_logic;                      -- Async Read Received Byte
-      RxD    : in  std_logic;                      -- RS-232 data input
-      RxAv   : out std_logic;                      -- Byte available
-      DataO  : out std_logic_vector(7 downto 0));  -- Byte received
+      Clk       : in  std_logic;                      -- system clock signal
+      Reset     : in  std_logic;                      -- Reset input
+      Enable    : in  std_logic;                      -- Enable input
+      ReadA     : in  std_logic;                      -- Async Read Received Byte
+      RxD       : in  std_logic;                      -- RS-232 data input
+      RxAv      : out std_logic;                      -- Byte available
+      DataO     : out std_logic_vector(7 downto 0);   -- Byte received
+      IntRxFlag : out std_logic;                      -- Rx Interrupt flag
+      IntRxEn   : in  std_logic);                     -- Rx Interrupt enable
+
   end component;
 
   component TxUnit
     port (
-      Clk    : in  std_logic;                      -- Clock signal
-      Reset  : in  std_logic;                      -- Reset input
-      Enable : in  std_logic;                      -- Enable input
-      LoadA  : in  std_logic;                      -- Asynchronous Load
-      TxD    : out std_logic;                      -- RS-232 data output
-      Busy   : out std_logic;                      -- Tx Busy
-      DataI  : in  std_logic_vector(7 downto 0));  -- Byte to transmit
+      Clk       : in  std_logic;                      -- Clock signal
+      Reset     : in  std_logic;                      -- Reset input
+      Enable    : in  std_logic;                      -- Enable input
+      LoadA     : in  std_logic;                      -- Asynchronous Load
+      TxD       : out std_logic;                      -- RS-232 data output
+      Busy      : out std_logic;                      -- Tx Busy
+      DataI     : in  std_logic_vector(7 downto 0);   -- Byte to transmit
+      IntTxFlag : out std_logic;                      -- Tx Interrupt flag
+      IntTxEn   : in  std_logic);                     -- Tx Interrupt enable
+
   end component;
 
-  signal RxData  : std_logic_vector(7 downto 0);   -- Last Byte received
-  signal RxData1 : std_logic_vector(7 downto 0);
-  signal TxData  : std_logic_vector(7 downto 0);   -- Last bytes transmitted
-  signal SReg    : std_logic_vector(1 downto 0);   -- Status register
-  signal CReg    : std_logic_vector(7 downto 2);   -- Control register
-  signal EnabRx  : std_logic;           -- Enable RX unit
-  signal EnabTx  : std_logic;           -- Enable TX unit
-  signal RxAv    : std_logic;           -- Data Received
-  signal TxBusy  : std_logic;           -- Transmiter Busy
-  signal ReadA   : std_logic;           -- Async Read receive buffer
-  signal LoadA   : std_logic;           -- Async Load transmit buffer
-  signal Sig0    : std_logic;           -- gnd signal
-  signal Sig1    : std_logic;           -- vcc signal  
-  signal Divisor : std_logic_vector(15 downto 0);  -- Baud Rate
+  signal RxData    : std_logic_vector(7 downto 0);   -- Last Byte received
+  signal RxData1   : std_logic_vector(7 downto 0);
+  signal TxData    : std_logic_vector(7 downto 0);   -- Last bytes transmitted
+  signal SReg      : std_logic_vector(1 downto 0);   -- Status register
+  signal CReg      : std_logic_vector(7 downto 2);   -- Control register
+  signal EnabRx    : std_logic;           -- Enable RX unit
+  signal EnabTx    : std_logic;           -- Enable TX unit
+  signal RxAv      : std_logic;           -- Data Received
+  signal TxBusy    : std_logic;           -- Transmiter Busy
+  signal ReadA     : std_logic;           -- Async Read receive buffer
+  signal LoadA     : std_logic;           -- Async Load transmit buffer
+  signal Sig0      : std_logic;           -- gnd signal
+  signal Sig1      : std_logic;           -- vcc signal  
+  signal Divisor   : std_logic_vector(15 downto 0);  -- Baud Rate
+  signal IntRxFlag : std_logic;           -- Byte received interrupt
+  signal IntTxFlag : std_logic;           -- Byte transmitted interrupt
+  signal IntRxEn   : std_logic;			   -- Enable interrupt on byte received
+  signal IntTxEn   : std_logic;           -- Enable interrupt on byte transmitted  
 
 begin
   sig0 <= '0';
@@ -115,13 +125,14 @@ begin
     port map (BR_CLK_I, sig0, sig1, Divisor, EnabRx);
   Uart_Txrate : Counter                 -- 4 Divider for Tx
     port map (BR_CLK_I, Sig0, EnabRx, std_logic_vector(to_unsigned(4, 16)), EnabTx);
-  Uart_TxUnit : TxUnit port map (BR_CLK_I, WB_RST_I, EnabTX, LoadA, TxD_PAD_O, TxBusy, TxData);
-  Uart_RxUnit : RxUnit port map (BR_CLK_I, WB_RST_I, EnabRX, ReadA, RxD_PAD_I, RxAv, RxData);
+  Uart_TxUnit : TxUnit 
+    port map (BR_CLK_I, WB_RST_I, EnabTX, LoadA, TxD_PAD_O, TxBusy, TxData, IntTxFlag, IntTxEn);
+  Uart_RxUnit : RxUnit 
+    port map (BR_CLK_I, WB_RST_I, EnabRX, ReadA, RxD_PAD_I, RxAv, RxData, IntRxFlag, IntRxEn);
   IntTx_O          <= not TxBusy;
   IntRx_O          <= RxAv;
   SReg(0)          <= not TxBusy;
   SReg(1)          <= RxAv;
-
 
   -- 16MHz x 1M = 64ms
 --  ESCctrl: process(WB_CLK_I)
@@ -176,6 +187,11 @@ BREAKctrl: process(WB_CLK_I)
         Divisor <= std_logic_vector(to_unsigned(MainClockSpeed / 4 / DefaultBaud, 16));
         CReg(7 downto 2) <= "000000";
       else
+        -- copy the interrupt status / control bits
+        IntTxEn <= CReg(2);
+        IntRxEn <= CReg(3);
+        CReg(4) <= IntTxFlag;
+        CReg(5) <= IntRxFlag;
         if (WB_STB_I = '1' and WB_WE_I = '1' and WB_ADR_I = "00") then  -- Write Byte to Tx
           TxData <= WB_DAT_I;
           LoadA  <= '1';                -- Load signal
