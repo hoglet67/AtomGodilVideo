@@ -126,9 +126,9 @@ begin
   Uart_Txrate : Counter                 -- 4 Divider for Tx
     port map (BR_CLK_I, Sig0, EnabRx, std_logic_vector(to_unsigned(4, 16)), EnabTx);
   Uart_TxUnit : TxUnit 
-    port map (BR_CLK_I, WB_RST_I, EnabTX, LoadA, TxD_PAD_O, TxBusy, TxData, IntTxFlag, IntTxEn);
+    port map (BR_CLK_I, WB_RST_I, EnabTX, LoadA, TxD_PAD_O, TxBusy, TxData, IntTxEn);
   Uart_RxUnit : RxUnit 
-    port map (BR_CLK_I, WB_RST_I, EnabRX, ReadA, RxD_PAD_I, RxAv, RxData, IntRxFlag, IntRxEn);
+    port map (BR_CLK_I, WB_RST_I, EnabRX, ReadA, RxD_PAD_I, RxAv, RxData, IntRxEn);
   IntTx_O          <= not TxBusy;
   IntRx_O          <= RxAv;
   SReg(0)          <= not TxBusy;
@@ -186,12 +186,8 @@ BREAKctrl: process(WB_CLK_I)
         LoadA <= '0';
         Divisor <= std_logic_vector(to_unsigned(MainClockSpeed / 4 / DefaultBaud, 16));
         CReg(7 downto 2) <= "000000";
-      else
+     else
         -- copy the interrupt status / control bits
-        IntTxEn <= CReg(2);
-        IntRxEn <= CReg(3);
-        CReg(4) <= IntTxFlag;
-        CReg(5) <= IntRxFlag;
         if (WB_STB_I = '1' and WB_WE_I = '1' and WB_ADR_I = "00") then  -- Write Byte to Tx
           TxData <= WB_DAT_I;
           LoadA  <= '1';                -- Load signal
@@ -203,6 +199,13 @@ BREAKctrl: process(WB_CLK_I)
         end if;
         if (WB_STB_I = '1' and WB_WE_I = '1' and WB_ADR_I = "01") then  -- Write Control
           CReg <= WB_DAT_I(7 downto 2);
+          IntTxEn <= WB_DAT_I(2);
+          IntRxEn <= WB_DAT_I(3);
+          IntTxFlag <= WB_DAT_I(4);
+          IntRxFlag <= WB_DAT_I(5);
+        else
+          CReg(4) <= IntTxFlag;
+          CReg(5) <= IntRxFlag;
         end if;
         if (WB_STB_I = '1' and WB_WE_I = '1' and WB_ADR_I = "10") then  -- Write Divisor Low
           Divisor(7 downto 0) <= WB_DAT_I;
