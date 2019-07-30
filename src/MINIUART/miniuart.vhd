@@ -125,10 +125,38 @@ begin
     port map (BR_CLK_I, sig0, sig1, Divisor, EnabRx);
   Uart_Txrate : Counter                 -- 4 Divider for Tx
     port map (BR_CLK_I, Sig0, EnabRx, std_logic_vector(to_unsigned(4, 16)), EnabTx);
-  Uart_TxUnit : TxUnit 
-    port map (BR_CLK_I, WB_RST_I, EnabTX, LoadA, TxD_PAD_O, TxBusy, TxData, IntTxEn);
-  Uart_RxUnit : RxUnit 
-    port map (BR_CLK_I, WB_RST_I, EnabRX, ReadA, RxD_PAD_I, RxAv, RxData, IntRxEn);
+--  Uart_TxUnit : TxUnit 
+--    port map (BR_CLK_I, WB_RST_I, EnabTX, LoadA, TxD_PAD_O, TxBusy, TxData, IntTxFlag, IntTxEn);
+
+Uart_TxUnit : TxUnit
+    port map (
+      Clk       => BR_CLK_I,   -- Clock signal
+      Reset     => WB_RST_I,   -- Reset input
+      Enable    => EnabTX,     -- Enable input
+      LoadA     => LoadA,      -- Asynchronous Load
+      TxD       => TxD_PAD_O,  -- RS-232 data output
+      Busy      => TxBusy,     -- Tx Busy
+      DataI     => TxData,     -- Byte to transmit
+      IntTxFlag => open,       -- Tx Interrupt flag (not connected)
+      IntTxEn   => IntTxEn     -- Tx Interrupt enable
+    );
+
+--  Uart_RxUnit : RxUnit 
+--    port map (BR_CLK_I, WB_RST_I, EnabRX, ReadA, RxD_PAD_I, RxAv, RxData, IntRxFlag, IntRxEn);
+   
+Uart_RxUnit : RxUnit
+    port map (
+      Clk       => BR_CLK_I,     -- system clock signal
+      Reset     => WB_RST_I,     -- Reset input
+      Enable    => EnabRX,       -- Enable input
+      ReadA     => ReadA,        -- Async Read Received Byte
+      RxD       => RxD_PAD_I,    -- RS-232 data input
+      RxAv      => RxAv,         -- Byte available
+      DataO     => RxData,       -- Byte received
+      IntRxFlag => open,         -- Rx Interrupt flag
+      IntRxEn   => IntRxEn       -- Rx Interrupt enable
+    );    
+
   IntTx_O          <= not TxBusy;
   IntRx_O          <= RxAv;
   SReg(0)          <= not TxBusy;
