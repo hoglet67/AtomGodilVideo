@@ -39,10 +39,9 @@ entity RxUnit is
      ReadA     : in  Std_logic;  -- Async Read Received Byte
      RxD       : in  std_logic;  -- RS-232 data input
      RxAv      : out std_logic;  -- Byte available
-     DataO     : out std_logic_vector(7 downto 0); -- Byte received
-     IntRxFlag : out std_logic;  -- Rx Interrupt flag
-     IntRxEn   : in  std_logic); -- Rx Interrupt enable
-end RxUnit;
+     DataO     : out std_logic_vector(7 downto 0) -- Byte received
+   );
+  end RxUnit;
 
 architecture Behaviour of RxUnit is
   signal RReg    : std_logic_vector(7 downto 0); -- receive register  
@@ -80,9 +79,9 @@ begin
                  RRegL <= '1';   -- Indicate byte received
                  DataO <= RReg;  -- Store received byte
 					  -- Set the Rx interrupt flag when Rx interrupt is enabled
-					  if IntRxEn = '1' then
-					    IntRxFlag <= '1';
-					  end if;
+--					  if IntRxEn = '1' then
+--					    IntRxFlag <= '1';
+--					  end if;
               when others =>
                  if (SampleCnt = 1 and BitPos >= 2) then -- Sample RxD on 1
                     RReg(BitPos-2) <= RxD; -- Deserialisation
