@@ -50,13 +50,14 @@ entity MINIUART is
     WB_STB_I  : in  std_logic;          -- Strobe
     WB_ACK_O  : out std_logic;          -- Acknowledge
 -- process signals     
-    IntTx_O   : out std_logic;  -- Transmit interrupt: indicate waiting for Byte
-    IntRx_O   : out std_logic;  -- Receive interrupt: indicate Byte received
+    IntTx_O   : out std_logic;          -- Transmit interrupt: indicate waiting for Byte
+    IntRx_O   : out std_logic;          -- Receive interrupt: indicate Byte received
     BR_Clk_I  : in  std_logic;          -- Clock used for Transmit/Receive
     TxD_PAD_O : out std_logic;          -- Tx RS232 Line
-    RxD_PAD_I : in  std_logic;         -- Rx RS232 Line
+    RxD_PAD_I : in  std_logic;          -- Rx RS232 Line
     ESC_O     : out std_logic;
-    BREAK_O   : out std_logic);
+    BREAK_O   : out std_logic;
+    uart_irq_n: out std_logic);         -- Serial interrupt to CPU core
 end MINIUART;
 
 -- Architecture for UART for synthesis
@@ -254,4 +255,7 @@ BREAKctrl: process(WB_CLK_I)
     Divisor(7 downto 0)  when WB_ADR_I = "10" else -- Read Divisor Low
     Divisor(15 downto 8) when WB_ADR_I = "11" else -- Read Divisor Low
     "00000000";
+  
+   uart_irq_n <= not(SReg(2) or SReg(3));
+   
 end Behaviour;

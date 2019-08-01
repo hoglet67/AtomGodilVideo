@@ -97,6 +97,7 @@ entity AtomGodilVideo is
         uart_TxD     : out   std_logic;     
         uart_escape  : out   std_logic;
         uart_break   : out   std_logic;  
+        uart_irq     : out   std_logic;
         
         -- VGA Signals
         final_red    : out   std_logic;
@@ -107,7 +108,10 @@ entity AtomGodilVideo is
         final_hsync  : out   std_logic;
 
         -- Default CharSet
-        charSet      : in    std_logic
+        charSet      : in    std_logic;
+        
+        -- Uart interrupt
+        uart_irq_n   : out   std_logic
         );
 end AtomGodilVideo;
 
