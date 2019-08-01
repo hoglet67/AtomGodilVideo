@@ -97,7 +97,6 @@ entity AtomGodilVideo is
         uart_TxD     : out   std_logic;     
         uart_escape  : out   std_logic;
         uart_break   : out   std_logic;  
-        uart_irq     : out   std_logic;
         
         -- VGA Signals
         final_red    : out   std_logic;
@@ -1049,7 +1048,8 @@ begin
             txd_pad_o => uart_TxD,
             rxd_pad_i => uart_RxD,
             esc_o     => uart_escape,
-            break_o   => uart_break  
+            break_o   => uart_break,  
+            uart_irq_n => uart_irq_n
         );
 
     end generate;

@@ -110,6 +110,9 @@ architecture Behaviour of MINIUART is
   signal Sig0      : std_logic;           -- gnd signal
   signal Sig1      : std_logic;           -- vcc signal  
   signal Divisor   : std_logic_vector(15 downto 0);  -- Baud Rate
+  signal TxBusy_last : std_logic;
+  signal RxAv_last : std_logic;
+
 
 begin
   sig0 <= '0';
@@ -207,23 +210,25 @@ BREAKctrl: process(WB_CLK_I)
         SReg(2) <= '0';
         SReg(3) <= '0';
      else
-        -- Set TX Interrupt flag if enabled
-        if falling_edge(TxBusy) then
+        -- Set TX Interrupt flag if enabled on falling edge of TxBusy
+        if TxBusy_last = '1' and TxBusy = '0' then
            if CReg(4) = '1' then
                SReg(2) <= '1'; -- not TxBusy;
            else
                SReg(2) <= '0';
            end if;
         end if;
+        TxBusy_last <= TxBusy;
          
-        -- Set RX Interrupt flag if enabled
-        if rising_edge(RxAv) then
+        -- Set RX Interrupt flag if enabled  on riding edge of RxAv
+        if RxAv_last = '0' and RxAv = '1' then
            if CReg(5) = '1' then
                SReg(3) <= '1'; -- RxAv
            else
                SReg(3) <= '0';
            end if;
         end if;
+        RxAv_last <= RxAv;
 
         if (WB_STB_I = '1' and WB_WE_I = '1' and WB_ADR_I = "00") then  -- Write Byte to Tx
           TxData <= WB_DAT_I;
