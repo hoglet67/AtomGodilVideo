@@ -105,7 +105,8 @@ entity AtomGodilVideo is
         final_blue   : out   std_logic;
         final_vsync  : out   std_logic;
         final_hsync  : out   std_logic;
-
+        final_blank  : out   std_logic;
+        
         -- Default CharSet
         charSet      : in    std_logic;
         
@@ -134,6 +135,9 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal vga_blue  : std_logic_vector (7 downto 0);
     signal vga_vsync : std_logic;
     signal vga_hsync : std_logic;
+    signal vga_blank : std_logic;
+    signal vga_vblank : std_logic;
+    signal vga_hblank : std_logic;
     
     -- 8Kx8 Dual port video RAM signals
     -- Port A connects to Atom and is read/write
@@ -206,6 +210,7 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal vga80_B       : std_logic;
     signal vga80_vsync   : std_logic;
     signal vga80_hsync   : std_logic;
+    signal vga80_blank   : std_logic;
     signal vga80_invert  : std_logic;
     signal vga80_char_a  : std_logic_vector (10 downto 0);
     signal vga80_char_d  : std_logic_vector (7 downto 0);
@@ -313,13 +318,15 @@ begin
             artifact_en    => '0',
             artifact_set   => '0',
             artifact_phase => '0',
-            hblank         => open,
-            vblank         => open,
+            hblank         => vga_hblank,
+            vblank         => vga_vblank,
             cvbs           => open,
             black_backgnd  => BLACK_BACKGND,
             char_a         => mc6847_char_a,
             char_d_o       => char_d_o
             );
+
+    vga_blank <= vga_vblank or vga_hblank;
 
     nFS <= fs_n;
     
@@ -401,6 +408,7 @@ begin
     final_blue   <= vga_blue(7)     when vga80x40mode = '0' else vga80_B;
     final_vsync  <= vga_vsync       when vga80x40mode = '0' else vga80_vsync;
     final_hsync  <= vga_hsync       when vga80x40mode = '0' else vga80_hsync;
+    final_blank  <= vga_blank       when vga80x40mode = '0' else vga80_blank;
 
     -- int_char_a(10 downto 4) select character 0..127
     -- int_chat_a( 3 downto 0) select row 0..11    
@@ -797,7 +805,8 @@ begin
             G => vga80_G,
             B => vga80_B,
             hsync => vga80_hsync,
-            vsync => vga80_vsync 
+            vsync => vga80_vsync,
+            blank => vga80_blank
         );
 
         vga80_char_d <= char_d_o when vga80_invert='0' else char_d_o xor "11111111"; 

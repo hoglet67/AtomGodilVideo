@@ -45,7 +45,8 @@ entity vga80x40 is
     G           : out std_logic;
     B           : out std_logic;
     hsync       : out std_logic;
-    vsync       : out std_logic
+    vsync       : out std_logic;
+    blank       : out std_logic
     );   
 end vga80x40;
 
@@ -59,7 +60,7 @@ architecture rtl of vga80x40 is
   signal hsync_int : std_logic;
   signal vsync_int : std_logic;
   
-  signal blank : std_logic;
+  signal active : std_logic;
   signal hctr  : integer range 799 downto 0;
   signal vctr  : integer range 525 downto 0;
   -- character/pixel position on the screen
@@ -167,8 +168,9 @@ begin
 
 -- Proboscide99 31/08/08
 --  blank <= '0' when (hctr > 639) or (vctr > 479) else '1';
-  blank <= '0' when (hctr < 8) or (hctr > 647) or (vctr > 479) else '1';
-
+  active <= '0' when (hctr < 8) or (hctr > 647) or (vctr > 479) else '1';
+  blank <= not active;
+  
 -------------------------------------------------------------------------------
 -------------------------------------------------------------------------------  
 -- flip-flips for sync of R, G y B signal, initialized with '0'
@@ -257,10 +259,10 @@ begin
     scrx_079 <= '1' when scrx = 079 else '0';
 
     chrx_rs <= chrx_007 or hctr_639;
-    chrx_ce <= '1' and blank;
+    chrx_ce <= '1' and active;
 
     chry_rs <= chry_011 or vctr_479;
-    chry_ce <= hctr_639 and blank;
+    chry_ce <= hctr_639 and active;
 
     scrx_ce <= chrx_007;
     scrx_rs <= hctr_639;
@@ -306,7 +308,7 @@ begin
   U_LOSR : losr generic map (N => 8)
     port map (reset, clk25MHz, losr_ld, losr_ce, losr_do, FONT_D);
   
-  losr_ce <= blank;
+  losr_ce <= active;
   losr_ld <= '1' when (chrx = 007) else '0';
 
   -- Apply the underline attriute to the luminance
@@ -325,11 +327,11 @@ begin
 
   -- video out, vga_en control signal enable/disable vga signal
   R_int <= (((not ctl_attr) and ((y and ctl_r) or ((not y) and ctl_r_bg))) or
-                (ctl_attr and ((ya and attr(2)) or ((not ya) and attr(6))))) and blank;
+                (ctl_attr and ((ya and attr(2)) or ((not ya) and attr(6))))) and active;
   G_int <= (((not ctl_attr) and ((y and ctl_g) or ((not y) and ctl_g_bg))) or
-                (ctl_attr and ((ya and attr(1)) or ((not ya) and attr(5))))) and blank;
+                (ctl_attr and ((ya and attr(1)) or ((not ya) and attr(5))))) and active;
   B_int <= (((not ctl_attr) and ((y and ctl_b) or ((not y) and ctl_b_bg))) or
-                (ctl_attr and ((ya and attr(0)) or ((not ya) and attr(4))))) and blank;
+                (ctl_attr and ((ya and attr(0)) or ((not ya) and attr(4))))) and active;
     
   hsync <= hsync_int and vga_en;
   vsync <= vsync_int and vga_en;  
