@@ -4,7 +4,7 @@ use ieee.numeric_std.all;
 use ieee.std_logic_unsigned.all;
 
   entity Pointer is
-  port ( 
+  port (
          CLK  : in  std_logic;
          PO   : in  std_logic;
          PS   : in  std_logic_vector (4 downto 0);
@@ -35,12 +35,12 @@ use ieee.std_logic_unsigned.all;
 		clkb : IN std_logic;
 		web : IN std_logic;
 		addrb : IN std_logic_vector(7 downto 0);
-		dinb : IN std_logic_vector(7 downto 0);          
+		dinb : IN std_logic_vector(7 downto 0);
 		douta : OUT std_logic_vector(7 downto 0);
 		doutb : OUT std_logic_vector(7 downto 0)
 		);
 	END COMPONENT;
-    
+
 	COMPONENT PointerRamWhite
 	PORT(
 		clka : IN std_logic;
@@ -50,19 +50,19 @@ use ieee.std_logic_unsigned.all;
 		clkb : IN std_logic;
 		web : IN std_logic;
 		addrb : IN std_logic_vector(7 downto 0);
-		dinb : IN std_logic_vector(7 downto 0);          
+		dinb : IN std_logic_vector(7 downto 0);
 		douta : OUT std_logic_vector(7 downto 0);
 		doutb : OUT std_logic_vector(7 downto 0)
 		);
-	END COMPONENT;    
+	END COMPONENT;
 
 
-    
+
    begin
     xrel  <= ('1' & ADDR(4 downto 0)) - ('0' & X(7 downto 3));
     yrel  <= ADDR(12 downto 5) - Y;
     addrb <= PS & yrel(2 downto 0);
-    
+
  	Inst_PointerRamBlack: PointerRamBlack PORT MAP(
 		clka => CLK,
 		wea => '0',
@@ -87,8 +87,8 @@ use ieee.std_logic_unsigned.all;
 		addrb => addrb,
 		dinb => (others => '0'),
 		doutb => white
-	);    
-   
+	);
+
 --    process(yrel)
 --    begin
 --        case yrel(2 downto 0) is
@@ -114,8 +114,8 @@ use ieee.std_logic_unsigned.all;
 --              black <= "11001010";
 --              white <= "00000100";
 --          when others =>
---              black <= "10000100";              
---              white <= "00000000";              
+--              black <= "10000100";
+--              white <= "00000000";
 --        end case;
 --    end process;
 
@@ -152,5 +152,5 @@ use ieee.std_logic_unsigned.all;
     dout <= (din and (sblack(15 downto 8) xor "11111111")) or swhite(15 downto 8) when PO = '1' and xrel = 32 and yrel < 8 else
             (din and (sblack(7 downto 0)  xor "11111111")) or swhite(7 downto 0)  when PO = '1' and xrel = 33 and yrel < 8 else
             din;
-      
+
   end Behavioral;

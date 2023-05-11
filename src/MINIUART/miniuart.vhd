@@ -50,8 +50,8 @@ entity MINIUART is
     WB_STB_I  : in  std_logic;          -- Strobe
     WB_ACK_O  : out std_logic;          -- Acknowledge
 -- process signals     
-    IntTx_O   : out std_logic;          -- Transmit interrupt: indicate waiting for Byte
-    IntRx_O   : out std_logic;          -- Receive interrupt: indicate Byte received
+--  IntTx_O   : out std_logic;          -- Transmit interrupt: indicate waiting for Byte
+--  IntRx_O   : out std_logic;          -- Receive interrupt: indicate Byte received
     BR_Clk_I  : in  std_logic;          -- Clock used for Transmit/Receive
     TxD_PAD_O : out std_logic;          -- Tx RS232 Line
     RxD_PAD_I : in  std_logic;          -- Rx RS232 Line

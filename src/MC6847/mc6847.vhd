@@ -34,7 +34,7 @@ entity mc6847 is
             artifact_en    : in  std_logic;
             artifact_set   : in  std_logic;
             artifact_phase : in  std_logic;
-            cvbs           : out std_logic_vector(7 downto 0);
+--          cvbs           : out std_logic_vector(7 downto 0);
             black_backgnd  : in  std_logic;
             char_a         : out std_logic_vector(10 downto 0);
             char_d_o       : in std_logic_vector(7 downto 0)
@@ -119,7 +119,7 @@ architecture SYN of mc6847 is
     signal intn_ext_r     : std_logic;
     signal dd_r           : std_logic_vector(7 downto 0);
     signal pixel_char_d_o : std_logic_vector(7 downto 0);
-    signal cvbs_char_d_o  : std_logic_vector(7 downto 0);  -- CVBS char_d_o out
+--  signal cvbs_char_d_o  : std_logic_vector(7 downto 0);  -- CVBS char_d_o out
 
     alias hs_int   : std_logic is cvbs_hblank;
     signal fs_int  : std_logic;
@@ -218,7 +218,7 @@ begin
 
     -- generate horizontal timing for VGA
     -- generate line buffer address for reading VGA char_d_o
-    PROC_VGA : process (clk, reset)
+    PROC_VGA : process (clk, clk_ena, reset)
         variable h_count        : integer range 0 to H_TOTAL_PER_LINE;
         variable active_h_count : std_logic_vector(7 downto 0);
         variable vga_vblank_r   : std_logic;
@@ -275,7 +275,7 @@ begin
 
     -- generate horizontal timing for CVBS
     -- generate line buffer address for writing CVBS char_d_o
-    PROC_CVBS : process (clk, reset)
+    PROC_CVBS : process (clk, cvbs_clk_ena, reset)
         variable h_count        : integer range 0 to H_TOTAL_PER_LINE;
         variable active_h_count : std_logic_vector(7 downto 0);
         variable cvbs_hblank_r  : std_logic := '0';
@@ -439,7 +439,7 @@ begin
     end process;
 
     -- handle latching & shifting of character, graphics char_d_o
-    process (clk, reset)
+    process (clk, cvbs_clk_ena, reset)
         variable count : std_logic_vector(3 downto 0) := (others => '0');
     begin
         if reset = '1' then
@@ -533,7 +533,7 @@ begin
     end process;
 
     -- generate pixel char_d_o
-    process (clk, reset)
+    process (clk, cvbs_clk_ena, reset)
         variable luma   : std_logic;
         variable chroma : std_logic_vector(2 downto 0);
     begin
@@ -585,9 +585,9 @@ begin
     -- only write to the linebuffer during active display
     cvbs_linebuf_we <= not (cvbs_vblank or cvbs_hblank);
 
-    cvbs <= '0' & cvbs_vsync & "000000" when cvbs_vblank = '1' else
-            '0' & cvbs_hsync & "000000" when cvbs_hblank = '1' else
-            cvbs_char_d_o;
+ -- cvbs <= '0' & cvbs_vsync & "000000" when cvbs_vblank = '1' else
+ --         '0' & cvbs_hsync & "000000" when cvbs_hblank = '1' else
+ --         cvbs_char_d_o;
 
     -- assign outputs
 
@@ -600,7 +600,7 @@ begin
     -- -  we do that at the output so we can use a 
     --    higher colour-resolution palette
     --    without using memory in the line buffer
-    PROC_OUTPUT : process (clk)
+    PROC_OUTPUT : process (clk, reset)
         variable r     : std_logic_vector(red'range);
         variable g     : std_logic_vector(green'range);
         variable b     : std_logic_vector(blue'range);
@@ -664,20 +664,24 @@ begin
             red <= r; green <= g; blue <= b;
         end if;  -- rising_edge(clk)
 
-
-        if CVBS_NOT_VGA then
-            hsync  <= cvbs_hsync;
-            vsync  <= cvbs_vsync;
-            hblank <= cvbs_hblank;
-            vblank <= cvbs_vblank;
-        else
-            hsync  <= vga_hsync;
-            vsync  <= vga_vsync;
-            hblank <= not vga_hborder;
-            vblank <= not cvbs_vborder;
-        end if;
+--        if CVBS_NOT_VGA then
+--            hsync  <= cvbs_hsync;
+--            vsync  <= cvbs_vsync;
+--            hblank <= cvbs_hblank;
+--            vblank <= cvbs_vblank;
+--        else
+--            hsync  <= vga_hsync;
+--            vsync  <= vga_vsync;
+--            hblank <= not vga_hborder;
+--            vblank <= not cvbs_vborder;
+--        end if;
 
     end process PROC_OUTPUT;
+
+    hsync  <= cvbs_hsync  when CVBS_NOT_VGA else vga_hsync;
+    vsync  <= cvbs_vsync  when CVBS_NOT_VGA else vga_vsync;
+    hblank <= cvbs_hblank when CVBS_NOT_VGA else not vga_hborder;
+    vblank <= cvbs_vblank when CVBS_NOT_VGA else not cvbs_vborder;
 
 -- line buffer for scan doubler gives us vga monitor compatible output
     process (clk)

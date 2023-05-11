@@ -118,7 +118,7 @@ constant RES_800  : std_logic := '1';
 
 type fsm_state is (sReset,sIdle,sSetX,sSetY,sSetMaxX,sSetMaxY);
 -- signal that holds the current state of the FSM
-signal state: fsm_state := sIdle;
+signal state: fsm_state := sReset;
 
 begin
 

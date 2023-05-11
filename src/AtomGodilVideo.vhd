@@ -180,10 +180,13 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal mc6847_addrb_hw : std_logic_vector (12 downto 0);
     signal char_d_o : std_logic_vector (7 downto 0);
 
+    signal pointer_on     : std_logic;
     signal pointer_nr     : std_logic_vector (7 downto 0);
     signal pointer_nr_rd  : std_logic_vector (7 downto 0);
     signal pointer_x      : std_logic_vector (7 downto 0);
+    signal unused_x       : std_logic_vector (1 downto 0);
     signal pointer_y      : std_logic_vector (7 downto 0);
+    signal unused_y       : std_logic_vector (1 downto 0);
     signal pointer_y_inv  : std_logic_vector (7 downto 0);
     signal pointer_left   : std_logic;
     signal pointer_middle : std_logic;
@@ -320,7 +323,7 @@ begin
             artifact_phase => '0',
             hblank         => vga_hblank,
             vblank         => vga_vblank,
-            cvbs           => open,
+--          cvbs           => open,
             black_backgnd  => BLACK_BACKGND,
             char_a         => mc6847_char_a,
             char_d_o       => char_d_o
@@ -974,9 +977,10 @@ begin
 
     Optional_Mouse: if CImplMouse generate
 
+
         Inst_Pointer: entity work.Pointer PORT MAP (
             CLK => clock_vga,
-            PO => not pointer_nr(7),
+            PO => pointer_on,
             PS => pointer_nr(4 downto 0),
             X  => pointer_x,
             Y  => pointer_y,
@@ -999,13 +1003,15 @@ begin
             NEW_EVENT => open,
             RIGHT => pointer_right,
             XPOS(7 downto 0) => pointer_x,
-            XPOS(9 downto 8) => open,
+            XPOS(9 downto 8) => unused_x,
             YPOS(7 downto 0) => pointer_y,
-            YPOS(9 downto 8) => open,
+            YPOS(9 downto 8) => unused_y,
             ZPOS => open,
             PS2_CLK => PS2_CLK,
             PS2_DATA => PS2_DATA
         );    
+
+        pointer_on <= not pointer_nr(7);
 
         pointer_nr_rd <= pointer_nr(7) & "1111" & not pointer_middle & not pointer_right & not pointer_left;
     
@@ -1051,8 +1057,8 @@ begin
             wb_we_i  => uart_we,
             wb_stb_i => uart_cs,
             wb_ack_o => open,
-            inttx_o  => open,
-            intrx_o  => open,
+--          inttx_o  => open,
+--          intrx_o  => open,
             br_clk_i => clock_main,
             txd_pad_o => uart_TxD,
             rxd_pad_i => uart_RxD,
