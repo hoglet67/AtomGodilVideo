@@ -1,20 +1,20 @@
 ----------------------------------------------------------------------------------
--- Company: 
--- Engineer: 
--- 
+-- Company:
+-- Engineer:
+--
 -- Create Date:
--- Design Name: 
+-- Design Name:
 -- Module Name:
--- Project Name: 
--- Target Devices: 
--- Tool versions: 
--- Description: 
+-- Project Name:
+-- Target Devices:
+-- Tool versions:
+-- Description:
 --
--- Dependencies: 
+-- Dependencies:
 --
--- Revision: 
+-- Revision:
 -- Revision 0.01 - File Created
--- Additional Comments: 
+-- Additional Comments:
 --
 ----------------------------------------------------------------------------------
 library IEEE;
@@ -43,11 +43,11 @@ entity AtomGodilVideo is
        MainClockSpeed   : integer;
        DefaultBaud      : integer
     );
-    port (        
-        -- clock_vga is a full speed VGA clock (25MHz ish)      
+    port (
+        -- clock_vga is a full speed VGA clock (25MHz ish)
         clock_vga      : in    std_logic;
 
-        -- clock_main is the main clock    
+        -- clock_main is the main clock
         clock_main      : in    std_logic;
 
         -- A fixed 32MHz clock for the SID
@@ -61,7 +61,7 @@ entity AtomGodilVideo is
 
         -- Reset signal to 6847 (active high), not currently used
         reset_vid    : in    std_logic;
-        
+
         -- Main Address / Data Bus signals
         din          : in    std_logic_vector (7 downto 0);
         dout         : out   std_logic_vector (7 downto 0);
@@ -85,7 +85,7 @@ entity AtomGodilVideo is
         sid_we       : in    std_logic;
         sid_audio    : out   std_logic;
         sid_audio_d  : out   std_logic_vector(17 downto 0);
-        
+
         -- PS/2 Mouse signals
         PS2_CLK      : inout std_logic;
         PS2_DATA     : inout std_logic;
@@ -94,10 +94,10 @@ entity AtomGodilVideo is
         uart_cs      : in    std_logic;
         uart_we      : in    std_logic;
         uart_RxD     : in    std_logic;
-        uart_TxD     : out   std_logic;     
+        uart_TxD     : out   std_logic;
         uart_escape  : out   std_logic;
-        uart_break   : out   std_logic;  
-        
+        uart_break   : out   std_logic;
+
         -- VGA Signals
         final_red    : out   std_logic;
         final_green1 : out   std_logic;
@@ -106,10 +106,10 @@ entity AtomGodilVideo is
         final_vsync  : out   std_logic;
         final_hsync  : out   std_logic;
         final_blank  : out   std_logic;
-        
+
         -- Default CharSet
         charSet      : in    std_logic;
-        
+
         -- Uart interrupt
         uart_irq_n   : out   std_logic
         );
@@ -124,11 +124,12 @@ architecture BEHAVIORAL of AtomGodilVideo is
     -- Set this to 1 if you want black background on text (authentic Atom)
     constant BLACK_BACKGND : std_logic := '1';
 
-    signal clock_vga_en : std_logic;
+    signal clock_vga_en : std_logic := '0';
+
     -- Internal 1MHz clocks for SID
-    signal div32  : std_logic_vector (4 downto 0);
+    signal div32  : std_logic_vector (4 downto 0) := (others => '0');
     signal clock_sid_1MHz : std_logic;
-    
+
     -- VGA colour signals out of mc6847, only top 2 bits are used
     signal vga_red   : std_logic_vector (7 downto 0);
     signal vga_green : std_logic_vector (7 downto 0);
@@ -138,7 +139,7 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal vga_blank : std_logic;
     signal vga_vblank : std_logic;
     signal vga_hblank : std_logic;
-    
+
     -- 8Kx8 Dual port video RAM signals
     -- Port A connects to Atom and is read/write
     -- Port B connects to MC6847 and is read only
@@ -147,7 +148,7 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal doutb : std_logic_vector (7 downto 0);
 
     -- Masked (by nRST) version of the mode control signals
-    signal mask  : std_logic;    
+    signal mask  : std_logic;
     signal gm_masked  : std_logic_vector (2 downto 0);
     signal ag_masked  : std_logic;
     signal css_masked : std_logic;
@@ -167,12 +168,12 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal octl2 : std_logic_vector (7 downto 0);
     signal char_we : std_logic;
     signal char_reg : std_logic_vector (7 downto 0);
-    
+
     signal mc6847_an_s : std_logic;
     signal mc6847_intn_ext : std_logic;
     signal mc6847_inv : std_logic;
     signal mc6847_css : std_logic;
-    signal mc6847_d_final : std_logic_vector (7 downto 0); 
+    signal mc6847_d_final : std_logic_vector (7 downto 0);
     signal mc6847_d : std_logic_vector (7 downto 0);
     signal mc6847_d_with_pointer : std_logic_vector (7 downto 0);
     signal mc6847_char_a : std_logic_vector (10 downto 0);
@@ -193,21 +194,21 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal pointer_right  : std_logic;
 
     signal hwscrollmode   : std_logic;
-    
+
     signal scroll_left    : std_logic_vector (7 downto 0);
     signal scroll_right   : std_logic_vector (7 downto 0);
     signal scroll_h       : std_logic_vector (7 downto 0);
     signal scroll_top     : std_logic_vector (7 downto 0);
     signal scroll_bottom  : std_logic_vector (7 downto 0);
     signal scroll_v       : std_logic_vector (7 downto 0);
-    
+
     signal width32        : std_logic;
     signal lines          : std_logic_vector (7 downto 0);
 
     signal vga80x40mode  : std_logic;
     signal int_char_a    : std_logic_vector (10 downto 0);
     signal final_char_a  : std_logic_vector (10 downto 0);
-    
+
     signal vga80_R       : std_logic;
     signal vga80_G       : std_logic;
     signal vga80_B       : std_logic;
@@ -231,7 +232,7 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal bank1_we     : std_logic;
     signal bank_sela    : std_logic;
     signal bank_selb    : std_logic;
-    
+
     signal fs_n         : std_logic;
     signal hs_n         : std_logic;
     signal hs_n1        : std_logic;
@@ -245,7 +246,7 @@ architecture BEHAVIORAL of AtomGodilVideo is
     signal GM1          : std_logic_vector (2 downto 0);
     signal GM2          : std_logic_vector (2 downto 0);
     signal GM3          : std_logic_vector (2 downto 0);
-    
+
     function truncate(x: in std_logic_vector; constant length: in integer)
     return std_logic_vector is
         variable result : std_logic_vector(length-1 downto 0);
@@ -253,7 +254,7 @@ architecture BEHAVIORAL of AtomGodilVideo is
         result := x(length-1 downto 0);
         return result;
     end function;
-      
+
     function modulo5 (x : std_logic_vector(7 downto 0))
         return std_logic_vector is
 
@@ -283,7 +284,7 @@ architecture BEHAVIORAL of AtomGodilVideo is
         end if;
 
         return tmp2(2 downto 0);
-        
+
 
     end modulo5;
 
@@ -332,14 +333,14 @@ begin
     vga_blank <= vga_vblank or vga_hblank;
 
     nFS <= fs_n;
-    
+
     mc6847_d_final <= mc6847_d_with_pointer when CImplMouse else mc6847_d;
 
 
     Optional_not_DoubleVideo: if not CImplDoubleVideo generate
         -- 8Kx8 Dual port video RAM
         -- Port A connects to Atom and is read/write
-        -- Port B connects to MC6847 and is read only    
+        -- Port B connects to MC6847 and is read only
         Inst_VideoRam : entity work.VideoRam
             port map (
                 clka  => clock_main,
@@ -353,12 +354,12 @@ begin
                 dinb  => (others => '0'),
                 doutb => doutb
                 );
-    end generate;                
+    end generate;
 
     Optional_DoubleVideo: if CImplDoubleVideo generate
         -- Double Buffered 8Kx8 Dual port video RAM
         -- Port A connects to Atom and is read/write
-        -- Port B connects to MC6847 and is read only    
+        -- Port B connects to MC6847 and is read only
         Inst_VideoRam0 : entity work.VideoRam
             port map (
                 clka  => clock_main,
@@ -372,7 +373,7 @@ begin
                 dinb  => (others => '0'),
                 doutb => bank0_doutb
                 );
-                
+
         Inst_VideoRam1 : entity work.VideoRam
             port map (
                 clka  => clock_main,
@@ -386,11 +387,11 @@ begin
                 dinb  => (others => '0'),
                 doutb => bank1_doutb
                 );
-        bank0_we <= ram_we   when bank_sela = '0' else '0';        
-        bank1_we <= ram_we   when bank_sela = '1' else '0';        
-        douta <= bank1_douta when bank_sela = '1' else bank0_douta;        
-        doutb <= bank1_doutb when bank_selb = '1' else bank0_doutb;        
-    end generate;  
+        bank0_we <= ram_we   when bank_sela = '0' else '0';
+        bank1_we <= ram_we   when bank_sela = '1' else '0';
+        douta <= bank1_douta when bank_sela = '1' else bank0_douta;
+        doutb <= bank1_doutb when bank_selb = '1' else bank0_doutb;
+    end generate;
 
     bank_sela    <= extensions(4) when CImplDoubleVideo else '0';
     bank_selb    <= extensions(5) when CImplDoubleVideo else '0';
@@ -400,11 +401,11 @@ begin
              mc6847_addrb_hw when vga80x40mode = '0' and hwscrollmode = '1' else
              vga80_addrb     when hwscrollmode = '0' else
              vga80_addrb_hw;
-                    
+
     -- VGA Multiplexing between two controllers
-    
+
     vga80x40mode <= extensions(7) when CImplVGA80x40 else '0';
-    
+
     final_red    <= vga_red(7)      when vga80x40mode = '0' else vga80_R;
     final_green1 <= vga_green(7)    when vga80x40mode = '0' else vga80_G;
     final_green0 <= vga_green(6)    when vga80x40mode = '0' else vga80_G;
@@ -414,7 +415,7 @@ begin
     final_blank  <= vga_blank       when vga80x40mode = '0' else vga80_blank;
 
     -- int_char_a(10 downto 4) select character 0..127
-    -- int_chat_a( 3 downto 0) select row 0..11    
+    -- int_chat_a( 3 downto 0) select row 0..11
     int_char_a   <= mc6847_char_a   when vga80x40mode = '0' else vga80_char_a;
 
     final_char_a <= int_char_a when extensions(3) = '0' or int_char_a(10) = '1' else
@@ -427,7 +428,7 @@ begin
                     int_char_a(9 downto 4) & "11110" when int_char_a(3 downto 0) = "1000" else
                     int_char_a(9 downto 4) & "11111" when int_char_a(3 downto 0) = "1001" else
                     "00000000000";
-    
+
     -- Hold internal reset low for two frames after nRST released
     -- This avoids any diaplay glitches
     process (clock_vga)
@@ -448,7 +449,7 @@ begin
             mask <= state(2);
         end if;
     end process;
-    
+
     process (clock_vga)
     begin
         if rising_edge(clock_vga) then
@@ -483,10 +484,10 @@ begin
             end if;
         end if;
     end process;
-        
+
 
     reg_addr <= addr(4 downto 0);
-    
+
     reg_do <= extensions    when reg_addr = "00000" and (CImplGraphicsExt or CImplVGA80x40 or CImplHWScrolling or CImplDoubleVideo) else
               char_addr     when reg_addr = "00001" and CImplSoftChar    else
               ocrx          when reg_addr = "00010" and CImplVGA80x40    else
@@ -529,15 +530,15 @@ begin
                     when "00001" =>
                       char_addr <= din;
                     when others =>
-                      
+
                     end case;
                 end if;
             end if;
         end process;
-      
+
         char_we <= '1' when reg_cs = '1' and reg_we = '1' and char_addr(7) = '1' and reg_addr(4) = '1' else '0';
-    
-        ---- ram for char generator      
+
+        ---- ram for char generator
         charrom_inst : entity work.CharRam
             port map(
                 clka  => clock_main,
@@ -552,12 +553,12 @@ begin
                 dinb  => (others => '0'),
                 doutb => char_d_o
             );
-    
+
     end generate;
 
     Optional_Not_SoftChar: if not CImplSoftChar generate
 
-        ---- ram for char generator      
+        ---- ram for char generator
         charrom_inst : entity work.CharRom
             port map(
                 CLK  => clock_vga,
@@ -566,12 +567,12 @@ begin
             );
 
     end generate;
-    
+
     -----------------------------------------------------------------------------
     -- Graphics Extension Register
     -- shared by several optional functions
     -----------------------------------------------------------------------------
-    
+
     Optional_GraphicsExtReg: if CImplGraphicsExt or CImplVGA80x40 or CImplHWScrolling generate
 
         -- A register to control extra 6847 features
@@ -586,14 +587,14 @@ begin
                     -- extensions register
                     when "00000" =>
                       extensions <= din;
-                    when others =>                      
+                    when others =>
                     end case;
                 end if;
             end if;
         end process;
-        
+
     end generate;
-    
+
     -----------------------------------------------------------------------------
     -- Optional Graphics Modes
     -----------------------------------------------------------------------------
@@ -604,7 +605,7 @@ begin
         process (extensions, doutb, css_masked, ag_masked)
         begin
             case extensions(2 downto 0) is
-        
+
             -- Text plus 8 Colour Semigraphics 4
             when "001" =>
                 mc6847_an_s <= doutb(6);
@@ -617,8 +618,8 @@ begin
                 else
                     mc6847_d <= doutb;
                 end if;
-                mc6847_css <= css_masked;              
-    
+                mc6847_css <= css_masked;
+
             -- 2 Colour Text Only
             when "010" =>
                 mc6847_an_s <= '0';
@@ -630,7 +631,7 @@ begin
                     mc6847_d <= doutb;
                 end if;
                 mc6847_css <= doutb(6) xor css_masked;
-    
+
             -- 4 Colour Semigraphics 6 Only
             when "011" =>
                 mc6847_an_s <= '1';
@@ -638,7 +639,7 @@ begin
                 mc6847_inv <= doutb(7);
                 mc6847_d <= doutb;
                 mc6847_css <= css_masked;
-    
+
             -- Extended character set, lower case replaces Red Semigraphics
             -- 00-3F - Normal Upper Case
             -- 40-7F - Yellow Semigraphics 6
@@ -650,7 +651,7 @@ begin
                 mc6847_inv <= not doutb(6) and doutb(7);
                 mc6847_d <= doutb;
                 mc6847_css <= css_masked;
-    
+
             -- Extended character set, lower case replaces Red and Yello Semigraphics
             -- 00-3F - Normal Upper Case
             -- 40-7F - Normal Lower Case
@@ -662,12 +663,12 @@ begin
                 mc6847_inv <= doutb(7);
                 mc6847_d <= doutb;
                 mc6847_css <= css_masked;
-    
+
             -- Extended character set, lower case replaces inverse
             -- 00-3F - Normal Upper Case
             -- 40-7F - Yellow Semigraphics 6 -- Blue
             -- 80-BF - Normal Lower Case
-            -- C0-FF - Red Semigraphics 6 
+            -- C0-FF - Red Semigraphics 6
             when "110" =>
                 mc6847_an_s <= doutb(6);
                 mc6847_intn_ext <= doutb(6);
@@ -678,13 +679,13 @@ begin
                     mc6847_d <= doutb;
                 end if;
                 mc6847_css <= css_masked;
-    
-            -- Just replace inverse upper case (32 chars) with lower case    
+
+            -- Just replace inverse upper case (32 chars) with lower case
             -- 00-3F - Normal Upper Case
             -- 40-7F - Yellow Semigraphics 6
             -- 80-BF - Lower Case/Inverse Upper Case
             -- C0-FF - Red Semigraphics 6
-    
+
             when "111" =>
                 mc6847_an_s <= doutb(6);
                 mc6847_intn_ext <= doutb(6);
@@ -695,28 +696,28 @@ begin
                     mc6847_d <= doutb;
                 end if;
                 mc6847_css <= css_masked;
-    
-            -- Default Atom Behaviour        
+
+            -- Default Atom Behaviour
             -- 00-3F - Normal Upper Case
             -- 40-7F - Yellow Semigraphics 6
             -- 80-BF - Inverse Upper Case
             -- C0-FF - Red Semigraphics 6
-    
+
             when others =>
                 mc6847_an_s <= doutb(6);
                 mc6847_intn_ext <= doutb(6);
                 mc6847_inv <= doutb(7);
                 mc6847_d <= doutb;
                 mc6847_css <= css_masked;
-            
+
             end case;
-            
+
         end process;
 
     end generate;
 
     Optional_Not_GraphicsExt: if not CImplGraphicsExt generate
-      
+
         mc6847_an_s <= doutb(6);
         mc6847_intn_ext <= doutb(6);
         mc6847_inv <= doutb(7);
@@ -724,7 +725,7 @@ begin
         mc6847_css <= css_masked;
 
     end generate;
-      
+
     -----------------------------------------------------------------------------
     -- Optional SID
     -----------------------------------------------------------------------------
@@ -745,7 +746,7 @@ begin
                 pot_x => '0',
                 pot_y => '0',
                 audio_out => sid_audio,
-                audio_data => sid_audio_d 
+                audio_data => sid_audio_d
             );
 
         -- Clock_Sid_1MHz is derived by dividing down thw 32MHz clock
@@ -754,11 +755,11 @@ begin
             if rising_edge(clock_sid_32MHz) then
                 div32 <= div32 + 1;
             end if;
-        end process;        
+        end process;
         clock_sid_1MHz <= div32(4);
 
     end generate;
-      
+
     -----------------------------------------------------------------------------
     -- Optional VGA80x40 Mode
     -----------------------------------------------------------------------------
@@ -785,13 +786,13 @@ begin
                     when "00100" =>
                       octl <= din;
                     when "00101" =>
-                      octl2 <= din;                  
-                    when others =>                      
+                      octl2 <= din;
+                    when others =>
                     end case;
                 end if;
             end if;
         end process;
-      
+
         Inst_vga80x40: entity work.vga80x40 PORT MAP(
             reset => reset_vid,
             clk25MHz => clock_vga,
@@ -812,10 +813,10 @@ begin
             blank => vga80_blank
         );
 
-        vga80_char_d <= char_d_o when vga80_invert='0' else char_d_o xor "11111111"; 
-    
+        vga80_char_d <= char_d_o when vga80_invert='0' else char_d_o xor "11111111";
+
     end generate;
-      
+
 
     -----------------------------------------------------------------------------
     -- Optional HW Scrolling of Atom Modes
@@ -847,29 +848,29 @@ begin
                     when "01101" =>
                       scroll_top <= din;
                     when "01110" =>
-                      scroll_bottom <= din;                      
-                    when others =>                      
+                      scroll_bottom <= din;
+                    when others =>
                     end case;
                 end if;
             end if;
         end process;
-    
-        
+
+
         -- 32 bytes wide in Modes 0, 2a, 3a, 4a, 4
         -- 16 bytes wide in Modes 1a, 1, 2, 3
-        width32 <= '1' when ag_masked = '0' or 
-                    gm_masked = "010" or gm_masked = "100" or 
+        width32 <= '1' when ag_masked = '0' or
+                    gm_masked = "010" or gm_masked = "100" or
                     gm_masked = "110" or gm_masked = "111" else '0';
-                    
-                    
+
+
         lines <= "00010000" when ag_masked = '0' else
                  "01000000" when gm_masked = "000" or gm_masked = "001" or gm_masked = "010" else
                  "01100000" when gm_masked = "011" or gm_masked = "100" else
-                 "11000000";                               
-                 
+                 "11000000";
+
         -- Hardware Scrolling of atom modes
         -- mc6847_addrb -> mc6847_addrb_hw
-    
+
         process (lines, width32, scroll_left, scroll_right, scroll_h, scroll_top, scroll_bottom, scroll_v, mc6847_addrb)
         variable x : std_logic_vector(5 downto 0);
         variable y : std_logic_vector(8 downto 0);
@@ -877,7 +878,7 @@ begin
         variable scroll_h_max : std_logic_vector(7 downto 0);
         variable scroll_v_min : std_logic_vector(7 downto 0);
         variable scroll_v_max : std_logic_vector(7 downto 0);
-    
+
         begin
             scroll_h_min := scroll_left;
             scroll_v_min := scroll_top;
@@ -888,10 +889,10 @@ begin
                 scroll_h_max := 16 - scroll_right;
             else
                 x := "0" & mc6847_addrb(4 downto 0);
-                y := "0" & mc6847_addrb(12 downto 5);        
+                y := "0" & mc6847_addrb(12 downto 5);
                 scroll_h_max := 32 - scroll_right;
             end if;
-                
+
             if (x >= scroll_h_min and x < scroll_h_max) and (y >= scroll_v_min and y < scroll_v_max) then
                 x := truncate(x + scroll_h, 6);
                 if (x >= scroll_h_max) then
@@ -902,7 +903,7 @@ begin
                     y := y - (scroll_v_max - scroll_v_min);
                 end if;
             end if;
-                
+
             if (width32 = '0') then
                 mc6847_addrb_hw(3 downto 0) <= x(3 downto 0);
                 mc6847_addrb_hw(12 downto 4) <= y;
@@ -910,7 +911,7 @@ begin
                 mc6847_addrb_hw(4 downto 0) <= x(4 downto 0);
                 mc6847_addrb_hw(12 downto 5) <= y(7 downto 0);
             end if;
-    
+
         end process;
 
     end generate;
@@ -920,10 +921,10 @@ begin
     -----------------------------------------------------------------------------
 
     Optional_HWScrolling_VGA80x40: if CImplHWScrolling and CImplVGA80x40 generate
-        
+
         -- Hardware Scrolling of vga80x40 mode
         -- vga80_addrb -> vga80_addrb_hw
-        
+
         process (scroll_h, scroll_v, vga80_addrb)
         variable addr1 : std_logic_vector(11 downto 0);
         variable addr2 : std_logic_vector(13 downto 0);
@@ -938,29 +939,29 @@ begin
             else
                 attr := '1';
             end if;
-    
+
             -- calculate an address in the range 0..3199 regardless of whether char or attr being accessed
             if (attr = '0') then
                 addr1 := vga80_addrb(11 downto 0);
             else
                 addr1 := truncate(vga80_addrb - 3200, 12);
             end if;
-    
+
             -- calculate x from the address modulo 80
             x1 := modulo5(addr1(11 downto 4)) & addr1(3 downto 0);
-    
+
             -- calculate the new x after the scroll_h has been added, modulo 80
             x2 := truncate(('0' & x1) + ('0' & scroll_h), 8);
             if (x2 >= 80) then
                 x2 := x2 - 80;
             end if;
-    
+
             -- calculate the display start as 80 * scroll_v
             display_start := (scroll_v(5 downto 0) & "000000") + ("00" & scroll_v(5 downto 0) & "0000");
-    
+
                 -- calculate the new screen start address, extending the precision by one bit
             addr2 := ('0' & vga80_addrb) + ("00" & display_start) - ("0000000" & x1) + ("0000000" & x2(6 downto 0));
-             
+
             -- detect wrapping in wrapping in the character and attributevregions
             if ((attr = '0' and addr2 >= 3200) or addr2  >= 6400) then
                 vga80_addrb_hw <= truncate(addr2 - 3200, 13);
@@ -970,7 +971,7 @@ begin
         end process;
 
     end generate;
-  
+
     -----------------------------------------------------------------------------
     -- Optional Mouse
     -----------------------------------------------------------------------------
@@ -984,15 +985,15 @@ begin
             PS => pointer_nr(4 downto 0),
             X  => pointer_x,
             Y  => pointer_y,
-            ADDR => mc6847_addrb, 
-            DIN  => mc6847_d, 
+            ADDR => mc6847_addrb,
+            DIN  => mc6847_d,
             DOUT => mc6847_d_with_pointer
         );
-        
+
         Inst_MouseRefComp: entity work.MouseRefComp
         generic map (
             MainClockSpeed => MainClockSpeed
-        )        
+        )
         PORT MAP (
             CLK => clock_main,
             RESOLUTION => '1', -- select 256x192 resolution
@@ -1009,12 +1010,12 @@ begin
             ZPOS => open,
             PS2_CLK => PS2_CLK,
             PS2_DATA => PS2_DATA
-        );    
+        );
 
         pointer_on <= not pointer_nr(7);
 
         pointer_nr_rd <= pointer_nr(7) & "1111" & not pointer_middle & not pointer_right & not pointer_left;
-    
+
         pointer_y_inv <= pointer_y xor "11111111";
 
         process (clock_main)
@@ -1025,15 +1026,15 @@ begin
                 elsif (reg_cs = '1' and reg_we = '1') then
                     case reg_addr is
                     when "01010" =>
-                      pointer_nr <= din;                  
+                      pointer_nr <= din;
                     when others =>
-                      
+
                     end case;
                 end if;
             end if;
         end process;
 
-        
+
     end generate;
 
 
@@ -1042,7 +1043,7 @@ begin
     -----------------------------------------------------------------------------
 
     Optional_Uart: if CImplUart generate
-      
+
         inst_miniuart: entity work.miniuart
         generic map (
             MainClockSpeed => MainClockSpeed,
@@ -1063,17 +1064,16 @@ begin
             txd_pad_o => uart_TxD,
             rxd_pad_i => uart_RxD,
             esc_o     => uart_escape,
-            break_o   => uart_break,  
+            break_o   => uart_break,
             uart_irq_n => uart_irq_n
         );
 
     end generate;
-    
+
     Optional_Not_Uart: if not CImplUart generate
       uart_TxD    <= '1';
       uart_escape <= '1';
       uart_break  <= '1';
     end generate;
-        
-end BEHAVIORAL;
 
+end BEHAVIORAL;

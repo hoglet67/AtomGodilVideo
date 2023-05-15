@@ -169,7 +169,7 @@ architecture SYN of mc6847 is
         alias an_s_v : std_logic is vga_char_d_o(4);
         alias luma   : std_logic is vga_char_d_o(3);
         alias chroma : std_logic_vector(2 downto 0) is vga_char_d_o(2 downto 0);
-        
+
 
     begin
         if luma = '1' then
@@ -189,7 +189,7 @@ architecture SYN of mc6847 is
             b := (others => '0');
         end if;
     end procedure;
-    
+
 begin
 
     -- assign control inputs for debug/release build
@@ -228,7 +228,8 @@ begin
             vga_hsync  <= '1';
             vga_vsync  <= '1';
             vga_hblank <= '0';
-            
+            vga_hborder <= '0';
+
         elsif rising_edge (clk) and clk_ena = '1' then
 
             -- start hsync when cvbs comes out of vblank
@@ -282,7 +283,7 @@ begin
         --variable row_v : std_logic_vector(3 downto 0);
         -- for debug only
         variable videoaddr_base : std_logic_vector(12 downto 0);
-        
+
     begin
         if reset = '1' then
 
@@ -294,11 +295,12 @@ begin
             cvbs_vsync     <= '1';
             cvbs_hblank    <= '0';
             cvbs_vblank    <= '1';
+            cvbs_vborder   <= '0';
             vga_vblank     <= '1';
+            fs_int         <= '1';
             da0_int        <= (others => '0');
             cvbs_hblank_r  := '0';
             row_v          := (others => '0');
-            
         elsif rising_edge (clk) and cvbs_clk_ena = '1' then
 
             active_h_start <= '0';
@@ -354,11 +356,11 @@ begin
                             when "100" =>
                                 if (row_v(0) = '1') then
                                     videoaddr_base := videoaddr_base + 32;
-                                end if;                            
+                                end if;
                             when "101" =>
-                                    videoaddr_base := videoaddr_base + 16; 
+                                    videoaddr_base := videoaddr_base + 16;
                             when "110" | "111" =>
-                                    videoaddr_base := videoaddr_base + 32; 
+                                    videoaddr_base := videoaddr_base + 32;
                             when others =>
                                 null;
                         end case;
@@ -597,7 +599,7 @@ begin
             da0_int(3);
 
     -- map the palette to the pixel char_d_o
-    -- -  we do that at the output so we can use a 
+    -- -  we do that at the output so we can use a
     --    higher colour-resolution palette
     --    without using memory in the line buffer
     PROC_OUTPUT : process (clk, reset)
@@ -698,7 +700,7 @@ begin
         end if;
     end process;
 
----- rom for char generator      
+---- rom for char generator
 --    charrom_inst : entity work.mc6847t1_ntsc_plus_keith
 --        port map(
 --            CLK  => clk,

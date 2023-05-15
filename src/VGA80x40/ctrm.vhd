@@ -49,13 +49,17 @@ begin
   begin
     if reset = '1' then
       c <= 0;
-      
+
     elsif rising_edge(clk) then
       if ce = '1' then
         if rs = '1' then
           c <= 0;
         else
-          c <= c + 1;
+          if c = M-1 then
+              c <= 0;
+          else
+              c <= c + 1;
+          end if;
         end if;
       end if;
     end if;
