@@ -760,6 +760,11 @@ begin
 
     end generate;
 
+    Optional_Not_SID: if not CImplSID generate
+        sid_audio <= '0';
+        sid_audio_d <= (others => '0');
+    end generate;
+
     -----------------------------------------------------------------------------
     -- Optional VGA80x40 Mode
     -----------------------------------------------------------------------------
@@ -1074,6 +1079,7 @@ begin
       uart_TxD    <= '1';
       uart_escape <= '1';
       uart_break  <= '1';
+      uart_irq_n  <= '1';
     end generate;
 
 end BEHAVIORAL;
