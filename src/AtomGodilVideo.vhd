@@ -126,9 +126,9 @@ architecture BEHAVIORAL of AtomGodilVideo is
 
     signal clock_vga_en : std_logic := '0';
 
-    -- Internal 1MHz clocks for SID
+    -- Internal 1MHz clock enable for SID
     signal div32  : std_logic_vector (4 downto 0) := (others => '0');
-    signal clock_sid_1MHz : std_logic;
+    signal clken_sid : std_logic;
 
     -- VGA colour signals out of mc6847, only top 2 bits are used
     signal vga_red   : std_logic_vector (7 downto 0);
@@ -734,29 +734,34 @@ begin
 
         Inst_sid6581: entity work.sid6581
             port map (
-                clk_1MHz => clock_sid_1MHz,
-                clk32 => clock_sid_32MHz,
-                clk_DAC => clock_sid_dac,
-                reset => reset,
-                cs => sid_cs,
-                we => sid_we,
-                addr => reg_addr,
-                di => din,
-                do => sid_do,
-                pot_x => '0',
-                pot_y => '0',
-                audio_out => sid_audio,
+                clk_1MHz   => clock_sid_32MHz,      -- main SID clock signal
+                clken      => clken_sid,       -- main SID clock enable
+                clk_SYS    => clock_sid_32MHz,      -- System clock, user for register access and filter
+                clk_DAC    => clock_sid_dac,   -- DAC clock signal, must be as high as possible for the best results
+                reset      => reset,
+                cs         => sid_cs,
+                we         => sid_we,
+                addr       => reg_addr,
+                di         => din,
+                do         => sid_do,
+                pot_x      => '0',
+                pot_y      => '0',
+                audio_out  => sid_audio,
                 audio_data => sid_audio_d
             );
 
-        -- Clock_Sid_1MHz is derived by dividing down thw 32MHz clock
+        -- 1MHz clock enable, derived from the fixed 32MHz clock
         process (clock_sid_32MHz)
         begin
             if rising_edge(clock_sid_32MHz) then
                 div32 <= div32 + 1;
+                if div32 = 0 then
+                    clken_sid <= '1';
+                else
+                    clken_sid <= '0';
+                end if;
             end if;
         end process;
-        clock_sid_1MHz <= div32(4);
 
     end generate;
 
