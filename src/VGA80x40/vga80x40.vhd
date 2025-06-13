@@ -233,7 +233,7 @@ begin
 
     -- RAM read, ROM read
     signal ram_tmp : integer range 6400 downto 0;  --13 bits
-    signal rom_tmp : integer range 3070 downto 0;
+    signal rom_tmp : integer range 4095 downto 0;  --12 bits
 
   begin
 
@@ -279,7 +279,7 @@ begin
 
     TEXT_A <= std_logic_vector(TO_UNSIGNED(ram_tmp, 13));
 
-    rom_tmp <= TO_INTEGER(unsigned(TEXT_D(6 downto 0))) * 16 + chry;
+    rom_tmp <= TO_INTEGER(unsigned(TEXT_D)) * 16 + chry;
     FONT_A <= std_logic_vector(TO_UNSIGNED(rom_tmp, 12));
 
   end block;
