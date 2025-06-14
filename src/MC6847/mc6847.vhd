@@ -623,6 +623,13 @@ begin
                         g := (others => '0');
                         b := (others => '0');
                     end if;
+                    red    <= r;
+                    green  <= g;
+                    blue   <= b;
+                    hsync  <= cvbs_hsync;
+                    vsync  <= cvbs_vsync;
+                    hblank <= cvbs_hblank;
+                    vblank <= cvbs_vblank;
                 end if;
             else
                 if clk_ena = '1' then
@@ -661,29 +668,17 @@ begin
                         g := (others => '0');
                         b := (others => '0');
                     end if;
+                    red    <= r;
+                    green  <= g;
+                    blue   <= b;
+                    hsync  <= vga_hsync;
+                    vsync  <= vga_vsync;
+                    hblank <= not vga_hborder;
+                    vblank <= not cvbs_vborder;
                 end if;
             end if;  -- CVBS_NOT_VGA
-            red <= r; green <= g; blue <= b;
         end if;  -- rising_edge(clk)
-
---        if CVBS_NOT_VGA then
---            hsync  <= cvbs_hsync;
---            vsync  <= cvbs_vsync;
---            hblank <= cvbs_hblank;
---            vblank <= cvbs_vblank;
---        else
---            hsync  <= vga_hsync;
---            vsync  <= vga_vsync;
---            hblank <= not vga_hborder;
---            vblank <= not cvbs_vborder;
---        end if;
-
     end process PROC_OUTPUT;
-
-    hsync  <= cvbs_hsync  when CVBS_NOT_VGA else vga_hsync;
-    vsync  <= cvbs_vsync  when CVBS_NOT_VGA else vga_vsync;
-    hblank <= cvbs_hblank when CVBS_NOT_VGA else not vga_hborder;
-    vblank <= cvbs_vblank when CVBS_NOT_VGA else not cvbs_vborder;
 
 -- line buffer for scan doubler gives us vga monitor compatible output
     process (clk)
